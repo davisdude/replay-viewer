@@ -9,14 +9,14 @@
     --text-secondary: #64748b;
     --border-color: #e2e8f0;
     --hover-color: #f1f5f9;
-    
+
     /* Spacing */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
-    
+
     /* Borders */
     --border-radius: 0.5rem;
     --border-radius-lg: 0.75rem;
@@ -248,33 +248,33 @@
     .replay-viewer-container {
         padding: var(--spacing-md);
     }
-    
+
     .replay-search {
         flex-direction: column;
     }
-    
+
     .replay-search-input {
         min-width: auto;
     }
-    
+
     .replay-header {
         flex-direction: column;
         text-align: center;
     }
-    
+
     .match-info {
         flex-direction: column;
         gap: var(--spacing-sm);
     }
-    
+
     .tournament-name {
         text-align: center;
     }
-    
+
     .replay-pagination {
         gap: var(--spacing-xs);
     }
-    
+
     .replay-pagination button {
         padding: var(--spacing-xs) var(--spacing-sm);
         font-size: 0.9rem;
@@ -285,15 +285,15 @@
     .match-info {
         gap: var(--spacing-xs);
     }
-    
+
     .player-name {
         font-size: 1rem;
     }
-    
+
     .character-icons {
         font-size: 1.25rem;
     }
-    
+
     .vs-text {
         font-size: 1rem;
     }
