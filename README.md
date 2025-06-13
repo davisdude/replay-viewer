@@ -70,22 +70,22 @@ Simply use the provided `index.html` file as-is.
   <div id="melee-replay-viewer" class="replay-viewer-container">
     <!-- Search Section -->
     <div class="replay-search">
-        <input 
-            type="text" 
-            id="replaySearch" 
-            class="replay-search-input" 
+        <input
+            type="text"
+            id="replaySearch"
+            class="replay-search-input"
             placeholder="Search players, characters, tournaments..."
         >
         <button id="searchButton" class="replay-search-button">Search</button>
     </div>
-    
+
     <!-- Results Section -->
     <div id="replaysResults" class="replay-results">
         <div class="loading-message" style="display: none;">Loading replays...</div>
         <div class="no-results-message" style="display: none;">No matches found</div>
         <!-- Replay items will be dynamically inserted here -->
     </div>
-    
+
     <!-- Pagination -->
     <div id="pagination" class="replay-pagination"></div>
 </div>
@@ -114,7 +114,7 @@ Simply use the provided `index.html` file as-is.
   {
     "id": int,
     "player1": "Player 1 Name",
-    "player2": "Player 2 Name", 
+    "player2": "Player 2 Name",
     "player1Character": ["Character1", "Character2"],
     "player2Character": ["Character1"],
     "tournament": "Tournament Name",
