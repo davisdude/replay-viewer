@@ -53,6 +53,8 @@ body {
 }
 
 .replay-search-input {
+    background-color: var(--background-color);
+    color: var(--text-primary);
     flex: 1;
     min-width: 250px;
     padding: var(--spacing-md);
