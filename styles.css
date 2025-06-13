@@ -22,6 +22,10 @@
     --border-radius-lg: 0.75rem;
 }
 
+body {
+    background-color: var(--background-color);
+}
+
 * {
     box-sizing: border-box;
 }
