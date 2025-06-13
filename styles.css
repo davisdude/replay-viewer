@@ -30,6 +30,11 @@ body {
     box-sizing: border-box;
 }
 
+h1 {
+    text-align: center;
+    color: var(--text-primary);
+}
+
 /* Main container */
 .replay-viewer-container {
     max-width: 1200px;
