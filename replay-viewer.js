@@ -47,7 +47,8 @@
     const searchInput = document.getElementById('replaySearch');
     const searchButton = document.getElementById('searchButton');
     const resultsContainer = document.getElementById('replaysResults');
-    const paginationContainer = document.getElementById('pagination');
+    const paginationTopContainer = document.getElementById('paginationTop');
+    const paginationBottomContainer = document.getElementById('paginationBottom');
     const loadingMessage = resultsContainer.querySelector('.loading-message');
     const noResultsMessage = resultsContainer.querySelector('.no-results-message');
 
@@ -212,12 +213,13 @@
             });
         }
 
-        updatePagination();
+        updatePagination(paginationTopContainer);
+        updatePagination(paginationBottomContainer);
     }
 
 
     // Update pagination controls
-    function updatePagination() {
+    function updatePagination(paginationContainer) {
         paginationContainer.innerHTML = '';
 
         if (totalPages <= 1) return;
