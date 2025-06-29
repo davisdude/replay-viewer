@@ -43,6 +43,7 @@ def get_vod_data(set_data, tournament_name):
     if set_data["vodUrl"] is None:
         return None
     youtube_id = get_youtube_id_from_url(set_data["vodUrl"])
+    # TODO: Timezone
     date = datetime.datetime.fromtimestamp(set_data["completedAt"], datetime.UTC).strftime("%Y-%m-%d")
     if not youtube_id:
         print(f"Unsupported URL '{set_data['vodUrl']}' for set id {set_data['id']}")
@@ -111,7 +112,7 @@ def process_urls(urls, file):
     data = []
     for url in urls:
         data.extend(process_url(url))
-    json.dump(data, file, indent=4)
+    json.dump(data, file, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

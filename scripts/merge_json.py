@@ -28,4 +28,4 @@ if __name__ == "__main__":
     child_data = json.load(args.child)
 
     new_data = merge_json(parent_data, child_data)
-    json.dump(new_data, args.out, indent=4)
+    json.dump(new_data, args.out, indent=2)
