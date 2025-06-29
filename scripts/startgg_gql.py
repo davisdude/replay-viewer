@@ -1,4 +1,5 @@
 import os
+import time
 
 from gql import Client, gql
 from gql.transport.requests import RequestsHTTPTransport
@@ -25,19 +26,8 @@ GET_EVENT_SETS_QUERY = gql("""
 query EventSets($eventId: ID!, $page: Int!, $perPage: Int!) {
   event(id: $eventId) {
     sets(page: $page, perPage: $perPage, sortType: STANDARD) {
-      pageInfo {
-        totalPages
-      }
       nodes {
         id
-        fullRoundText
-        slots {
-          entrant {
-            participants {
-              gamerTag
-            }
-          }
-        }
       }
     }
   }
@@ -84,26 +74,36 @@ query SetEntrants($setId: ID!) {
 }
 """)
 
+def sleep(f):
+    def _sleep(*args, **kwargs):
+        result = f(*args, **kwargs)
+        time.sleep(60/80) # Sleep to avoid exceeding 80 req / minute
+        return result
+    return _sleep
 
+@sleep
 def get_tournament_name(client, slug):
     params = {"slug": slug}
     result = client.execute(GET_TOURNAMENT_NAME_QUERY, variable_values=params)
     return result["tournament"]["name"]
 
+@sleep
 def get_event_id(client, slug):
     params = {"slug": slug}
     result = client.execute(GET_EVENT_ID_QUERY, variable_values=params)
     return result["event"]["id"]
 
-def get_event_sets(client, event_id):
+@sleep
+def get_event_set_ids(client, event_id):
     params = {
         "eventId": event_id,
         "page": 1,
         "perPage": 500,
     }
     result = client.execute(GET_EVENT_SETS_QUERY, variable_values=params)
-    return result["event"]["sets"]["nodes"]
+    return [set_["id"] for set_ in  result["event"]["sets"]["nodes"]]
 
+@sleep
 def get_set_data(client, set_id):
     params = {"setId": set_id}
     result = client.execute(GET_SET_DATA_QUERY, variable_values=params)

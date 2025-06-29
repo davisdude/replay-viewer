@@ -2,7 +2,9 @@ import argparse
 import datetime
 import json
 import re
-import sys
+import time
+
+from gql.transport.exceptions import TransportServerError
 
 import startgg_gql
 
@@ -19,6 +21,11 @@ def get_slugs_from_url(url):
     return match.group("tournament"), match.group("event")
 
 def get_game_selection_data(set_data):
+    # Drop missing data
+    set_data["games"] = list(filter(lambda d: d["selections"], set_data["games"]))
+    if len(set_data["games"]) == 0:
+        return None
+
     participant_ids = list(set(
         selection["entrant"]["id"]
         for game in set_data["games"]
@@ -72,10 +79,8 @@ def get_vod_data(set_data, tournament_name):
     player_2_chars = []
     if set_data["games"] is not None:
         data = get_game_selection_data(set_data)
-        if data is None:
-            print(f"Invalid data for set id {set_data['id']}")
-            return None
-        player_1_name, player_1_chars, player_2_name, player_2_chars = data
+        if data is not None:
+            player_1_name, player_1_chars, player_2_name, player_2_chars = data
     return {
         "youtubeId": youtube_id,
         "date": date,
@@ -87,33 +92,42 @@ def get_vod_data(set_data, tournament_name):
         "tags": [],
     }
 
-def get_data(url):
+def process_url(url):
+    print(f"Processing {url}")
     data = []
-
     slugs = get_slugs_from_url(url)
     if not slugs:
         print("Could not get slugs")
         return []
     tournament_slug, event_slug = slugs
-
-    with startgg_gql.get_client() as session:
-        tournament_name = startgg_gql.get_tournament_name(session, tournament_slug)
-        event_id = startgg_gql.get_event_id(session, event_slug)
-        sets = startgg_gql.get_event_sets(session, event_id)
-        for set_data in sets:
-            set_id = set_data["id"]
-            set_data = startgg_gql.get_set_data(session, set_id)
+    client = startgg_gql.get_client()
+    tournament_name = startgg_gql.get_tournament_name(client, tournament_slug)
+    event_id = startgg_gql.get_event_id(client, event_slug)
+    set_ids = startgg_gql.get_event_set_ids(client, event_id)
+    while len(set_ids):
+        set_id = set_ids[-1]
+        print(f"Processing set {set_id}")
+        try:
+            set_data = startgg_gql.get_set_data(client, set_id)
             vod_data = get_vod_data(set_data, tournament_name)
             if vod_data:
                 vod_data["id"] = len(data)
                 data.append(vod_data)
-
+            set_ids.pop()
+        except TransportServerError as err:
+            if err.code == 429:
+                print("Too many requests; taking a nap")
+                print("(You shouldn't see this if you're limiting reqs properly)")
+                client = startgg_gql.get_client()
+                time.sleep(10)
+            else:
+                raise
     return data
 
 def process_urls(urls, file):
     data = []
     for url in urls:
-        data.extend(get_data(url))
+        data.extend(process_url(url))
     json.dump(data, file, indent=4)
 
 if __name__ == "__main__":
