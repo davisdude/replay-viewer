@@ -20,44 +20,24 @@ def get_slugs_from_url(url):
         return None
     return match.group("tournament"), match.group("event")
 
-def get_game_selection_data(set_data):
-    # Drop missing data
-    set_data["games"] = list(filter(lambda d: d["selections"], set_data["games"]))
-    if len(set_data["games"]) == 0:
-        return None
+def get_relevant_games(set_data, entrant_id):
+    # Drop irrelevant / missing data
+    return [
+        selection
+        for game in set_data["games"]
+        if (game["selections"] is not None)
+        for selection in game["selections"]
+        if (selection["entrant"]["id"] == entrant_id)
+    ]
 
-    participant_ids = list(set(
-        selection["entrant"]["id"]
-        for game in set_data["games"]
-        for selection in game["selections"]
-    ))
-    player_1_name = list(set([
-        selection["entrant"]["participants"][0]["gamerTag"]
-        for game in set_data["games"]
-        for selection in game["selections"]
-        if selection["entrant"]["id"] == participant_ids[0]
-    ]))
-    player_2_name = list(set([
-        selection["entrant"]["participants"][0]["gamerTag"]
-        for game in set_data["games"]
-        for selection in game["selections"]
-        if selection["entrant"]["id"] == participant_ids[1]
-    ]))
-    if (len(participant_ids) > 2) or (len(player_1_name) > 1) or (len(player_2_name) > 1):
+
+def get_game_selection_data(set_data, entrant_id):
+    relevant_games = get_relevant_games(set_data, entrant_id)
+    if len(relevant_games) == 0:
         return None
-    player_1_chars = list(set([
-        selection["character"]["name"]
-        for game in set_data["games"]
-        for selection in game["selections"]
-        if selection["entrant"]["id"] == participant_ids[0]
-    ]))
-    player_2_chars = list(set([
-        selection["character"]["name"]
-        for game in set_data["games"]
-        for selection in game["selections"]
-        if selection["entrant"]["id"] == participant_ids[1]
-    ]))
-    return player_1_name[0], player_1_chars, player_2_name[0], player_2_chars
+    name = relevant_games[0]["entrant"]["participants"][0]["gamerTag"]
+    chars = list(set(game["character"]["name"] for game in relevant_games))
+    return name, chars
 
 def get_vod_data(set_data, tournament_name):
     if set_data["vodUrl"] is None:
@@ -78,9 +58,12 @@ def get_vod_data(set_data, tournament_name):
     player_1_chars = []
     player_2_chars = []
     if set_data["games"] is not None:
-        data = get_game_selection_data(set_data)
-        if data is not None:
-            player_1_name, player_1_chars, player_2_name, player_2_chars = data
+        player_1_data = get_game_selection_data(set_data, set_data["slots"][0]["entrant"]["id"])
+        player_2_data = get_game_selection_data(set_data, set_data["slots"][1]["entrant"]["id"])
+        if player_1_data is not None:
+            player_1_name, player_1_chars = player_1_data
+        if player_2_data is not None:
+            player_2_name, player_2_chars = player_2_data
     return {
         "youtubeId": youtube_id,
         "date": date,
