@@ -6,7 +6,7 @@
         marth: "🤺",
         sheik: "🥷",
         peach: "👑",
-        falcon: "🏎️",
+        captainfalcon: "🏎️", falcon: "🏎️",
         jigglypuff: "🎈", puff: "🎈",
         pikachu: "⚡", pika: "⚡",
         samus: "🚀",
@@ -22,11 +22,11 @@
         iceclimbers: "🧊", ics: "🧊", icies: "🧊",
         bowser: "🐢",
         donkeykong: "🦍", dk: "🦍",
-        drmario: "💊", doc: "💊",
+        drmario: "💊", doc: "💊", "dr.mario": "💊",
         pichu: "🐣",
         roy: "🔥",
         kirby: "⭐",
-        gnw: "🫥", gameandwatch: "🫥", gw: "🫥", gamewatch: "🫥"
+        gnw: "🫥", gameandwatch: "🫥", gw: "🫥", gamewatch: "🫥", "mr.game&watch": "🫥",
     };
 
     // Configuration
