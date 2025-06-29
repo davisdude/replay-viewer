@@ -1,1 +1,2 @@
 google-api-python-client==2.170.0
+gql[all]==3.5.3
