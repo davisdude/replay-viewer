@@ -39,12 +39,12 @@ def get_game_selection_data(set_data, entrant_id):
     chars = list(set(game["character"]["name"] for game in relevant_games))
     return name, chars
 
-def get_vod_data(set_data, tournament_name):
+def get_vod_data(set_data, tournament_name, zone_info):
     if set_data["vodUrl"] is None:
         return None
     youtube_id = get_youtube_id_from_url(set_data["vodUrl"])
-    # TODO: Timezone
-    date = datetime.datetime.fromtimestamp(set_data["completedAt"], datetime.UTC).strftime("%Y-%m-%d")
+    time = set_data["startAt"] or set_data["startedAt"] or set_data["createdAt"]
+    date = datetime.datetime.fromtimestamp(time, tz=zone_info).strftime("%Y-%m-%d")
     if not youtube_id:
         print(f"Unsupported URL '{set_data['vodUrl']}' for set id {set_data['id']}")
         return None
@@ -85,7 +85,7 @@ def process_url(url):
         return []
     tournament_slug, event_slug = slugs
     client = startgg_gql.get_client()
-    tournament_name = startgg_gql.get_tournament_name(client, tournament_slug)
+    tournament_name, timezone = startgg_gql.get_tournament_name_and_timezone(client, tournament_slug)
     event_id = startgg_gql.get_event_id(client, event_slug)
     set_ids = startgg_gql.get_event_set_ids(client, event_id)
     while len(set_ids):
@@ -93,7 +93,7 @@ def process_url(url):
         print(f"Processing set {set_id}")
         try:
             set_data = startgg_gql.get_set_data(client, set_id)
-            vod_data = get_vod_data(set_data, tournament_name)
+            vod_data = get_vod_data(set_data, tournament_name, timezone)
             if vod_data:
                 vod_data["id"] = len(data)
                 data.append(vod_data)

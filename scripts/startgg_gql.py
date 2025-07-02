@@ -1,15 +1,17 @@
 import os
 import time
+from zoneinfo import ZoneInfo
 
 from gql import Client, gql
 from gql.transport.requests import RequestsHTTPTransport
 
 STARTGG_API_KEY = os.environ.get("STARTGG_API_KEY")
 
-GET_TOURNAMENT_NAME_QUERY = gql("""
+GET_TOURNAMENT_NAME_AND_TIMEZONE_QUERY = gql("""
 query getTournamentName($slug: String) {
   tournament(slug: $slug) {
     name
+    timezone
   }
 }
 """)
@@ -35,11 +37,14 @@ query EventSets($eventId: ID!, $page: Int!, $perPage: Int!) {
 """)
 
 # Need `slots` in case the set doesn't have game-specific data
+# Avoiding "completedAt" since that can reflect changes after the fact
 GET_SET_DATA_QUERY = gql("""
 query SetEntrants($setId: ID!) {
   set(id: $setId) {
     id
-    completedAt
+    startAt
+    startedAt
+    createdAt
     vodUrl
     slots {
       id
@@ -82,10 +87,10 @@ def sleep(f):
     return _sleep
 
 @sleep
-def get_tournament_name(client, slug):
+def get_tournament_name_and_timezone(client, slug):
     params = {"slug": slug}
-    result = client.execute(GET_TOURNAMENT_NAME_QUERY, variable_values=params)
-    return result["tournament"]["name"]
+    result = client.execute(GET_TOURNAMENT_NAME_AND_TIMEZONE_QUERY, variable_values=params)
+    return result["tournament"]["name"], ZoneInfo(result["tournament"]["timezone"])
 
 @sleep
 def get_event_id(client, slug):
