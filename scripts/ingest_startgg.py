@@ -36,8 +36,9 @@ def get_game_selection_data(set_data, entrant_id):
     if len(relevant_games) == 0:
         return None
     name = relevant_games[0]["entrant"]["participants"][0]["gamerTag"]
-    chars = list(set(game["character"]["name"] for game in relevant_games))
-    return name, chars
+    # Use dict to preserve order
+    chars = {game["character"]["name"]: True for game in relevant_games}
+    return name, list(dict.fromkeys(chars))
 
 def get_vod_data(set_data, tournament_name, zone_info):
     if set_data["vodUrl"] is None:
