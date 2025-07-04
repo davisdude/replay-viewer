@@ -24,6 +24,9 @@ def merge_json(parent_data, child_data):
             parent_vod["player2"] = tmp_player
             parent_vod["player1Characters"] = child_vod["player1Characters"] or parent_vod["player2Characters"]
             parent_vod["player2Characters"] = tmp_characters
+        else:
+            for item in manual_items:
+                parent_vod[item] = child_vod[item]
         for k, v in child_vod.items():
             if k == "id":
                 continue
