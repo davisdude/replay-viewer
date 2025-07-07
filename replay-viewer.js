@@ -31,6 +31,22 @@ async function loadData() {
             return dateB - dateA;
         });
 
+        // Get unique player tags
+        playerTagsSet = new Set([]);
+        replayData.forEach(replay => {
+            playerTagsSet.add(replay.player1);
+            playerTagsSet.add(replay.player2);
+        });
+        playerTags = Array.from(playerTagsSet).sort((a, b) => {
+            return a.toLowerCase().localeCompare(b.toLowerCase());
+        });
+
+        // Update player1Select
+        playerTags.forEach(tag => {
+            const option = document.createElement("option");
+            option.innerHTML = tag;
+            player1Select.appendChild(option);
+        });
     } catch (error) {
         console.error('Error loading data:', error);
         replayData = [];
@@ -336,6 +352,7 @@ let currentSearchResults = [];
 // DOM elements
 const searchInput = document.getElementById('replaySearch');
 const searchButton = document.getElementById('searchButton');
+const player1Select = document.getElementById('player1');
 const resultsContainer = document.getElementById('replaysResults');
 const paginationTopContainer = document.getElementById('paginationTop');
 const paginationBottomContainer = document.getElementById('paginationBottom');
