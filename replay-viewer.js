@@ -49,6 +49,15 @@ async function loadData() {
                 select.appendChild(option);
             }
         });
+
+        // Update character select
+        for (const character of Object.keys(characterIcons)) {
+            for (const select of [player1CharacterSelect, player2CharacterSelect]) {
+                const option = document.createElement("option");
+                option.innerHTML = character;
+                select.appendChild(option);
+            }
+        };
     } catch (error) {
         console.error('Error loading data:', error);
         replayData = [];
@@ -71,11 +80,11 @@ function createReplayItem(replay) {
     div.className = 'replay-item';
 
     const player1Chars = (replay.player1Characters || []).map(char =>
-        characterIcons[char.trim().toLowerCase().replace(/\s+/g, "")] || "❓"
+        characterIcons[char] || "❓"
     ).join(' ');
 
     const player2Chars = (replay.player2Characters || []).map(char =>
-        characterIcons[char.trim().toLowerCase().replace(/\s+/g, "")] || "❓"
+        characterIcons[char] || "❓"
     ).join(' ');
 
     div.innerHTML = `
@@ -263,21 +272,25 @@ function getSearchableMatch(replay, searchTerm) {
             });
         }
 
-        // Check if it's a character
-        if (characterIcons[piece]) {
-            const regex = new RegExp(`\\b${piece}\\b`);
-            return regex.test(searchableText);
-        }
-
         // Default search
         return searchableText.includes(piece);
     });
 }
 
-function getPlayerTagMatch(replay, playerTag) {
-    if (!playerTag) return true;
+function getPlayerMatch(replay, playerTag, characters) {
+    if (!playerTag && (characters.length == 0)) return true;
     if (!replay.player1 || !replay.player2) return false;
-    return (replay.player1 == playerTag) || (replay.player2 == playerTag);
+
+    const player1TagMatch = playerTag ? (replay.player1 == playerTag) : true;
+    const player2TagMatch = playerTag ? (replay.player2 == playerTag) : true;
+
+    let searchChars = new Set(characters);
+    let player1Chars = new Set(replay.player1Characters);
+    let player2Chars = new Set(replay.player2Characters);
+    const player1CharMatch = (characters.length != 0) ? searchChars.intersection(player1Chars).size > 0 : true;
+    const player2CharMatch = (characters.length != 0) ? searchChars.intersection(player2Chars).size > 0 : true;
+
+    return (player1TagMatch && player1CharMatch) || (player2TagMatch && player2CharMatch);
 }
 
 // Search functionality
@@ -285,8 +298,10 @@ function performSearch() {
     const searchTerm = searchInput.value.trim();
     const player1TagTerm = player1TagSelect.value;
     const player2TagTerm = player2TagSelect.value;
+    const player1Characters = Array.from(player1CharacterSelect.selectedOptions).map(({ value }) => value);
+    const player2Characters = Array.from(player2CharacterSelect.selectedOptions).map(({ value }) => value);
 
-    if (!searchTerm && !player1TagTerm && !player2TagTerm) {
+    if (!searchTerm && !player1TagTerm && !player2TagTerm && (player1Characters.length == 0) && (player2Characters.length == 0)) {
         displayReplays(replayData);
         return;
     }
@@ -298,9 +313,9 @@ function performSearch() {
 
         const filtered = replayData.filter(replay => {
             const searchMatch = getSearchableMatch(replay, searchTerm);
-            const player1TagMatch = getPlayerTagMatch(replay, player1TagTerm);
-            const player2TagMatch = getPlayerTagMatch(replay, player2TagTerm);
-            return searchMatch && player1TagMatch && player2TagMatch;
+            const player1Match = getPlayerMatch(replay, player1TagTerm, player1Characters);
+            const player2Match = getPlayerMatch(replay, player2TagTerm, player2Characters);
+            return searchMatch && player1Match && player2Match;
         });
 
         displayReplays(filtered);
@@ -326,32 +341,32 @@ function getPlayerAliases(searchTerm) {
 }
 
 const characterIcons = {
-    fox: "🦊",
-    falco: "🦅",
-    marth: "🤺",
-    sheik: "🥷",
-    peach: "👑",
-    captainfalcon: "🏎️", falcon: "🏎️",
-    jigglypuff: "🎈", puff: "🎈",
-    pikachu: "⚡", pika: "⚡",
-    samus: "🚀",
-    yoshi: "🦖",
-    luigi: "🎰",
-    mario: "🇮🇹",
-    ganondorf: "👹", ganon: "👹",
-    zelda: "🔮",
-    link: "🗡️",
-    younglink: "🏹", yink: "🏹", yl: "🏹", ylink: "🏹",
-    mewtwo: "🧠",
-    ness: "🧢",
-    iceclimbers: "🧊", ics: "🧊", icies: "🧊",
-    bowser: "🐢",
-    donkeykong: "🦍", dk: "🦍",
-    drmario: "💊", doc: "💊", "dr.mario": "💊",
-    pichu: "🐣",
-    roy: "🔥",
-    kirby: "⭐",
-    gnw: "🫥", gameandwatch: "🫥", gw: "🫥", gamewatch: "🫥", "mr.game&watch": "🫥",
+    "Bowser": "🐢",
+    "Captain Falcon": "🏎️",
+    "Donkey Kong": "🦍",
+    "Dr. Mario": "💊",
+    "Falco": "🦅",
+    "Fox": "🦊",
+    "Ganondorf": "👹",
+    "Ice Climbers": "🧊",
+    "Jigglypuff": "🎈",
+    "Kirby": "⭐",
+    "Link": "🗡️",
+    "Luigi": "🎰",
+    "Mario": "🇮🇹",
+    "Marth": "🤺",
+    "Mewtwo": "🧠",
+    "Mr. Game & Watch": "🫥",
+    "Ness": "🧢",
+    "Peach": "👑",
+    "Pichu": "🐣",
+    "Pikachu": "⚡",
+    "Roy": "🔥",
+    "Samus": "🚀",
+    "Sheik": "🥷",
+    "Yoshi": "🦖",
+    "Young Link": "🏹",
+    "Zelda": "🔮",
 };
 
 // Configuration
@@ -373,6 +388,8 @@ const searchInput = document.getElementById('replaySearch');
 const searchButton = document.getElementById('searchButton');
 const player1TagSelect = document.getElementById('player1Tag');
 const player2TagSelect = document.getElementById('player2Tag');
+const player1CharacterSelect = document.getElementById('player1Character');
+const player2CharacterSelect = document.getElementById('player2Character');
 const resultsContainer = document.getElementById('replaysResults');
 const paginationTopContainer = document.getElementById('paginationTop');
 const paginationBottomContainer = document.getElementById('paginationBottom');
