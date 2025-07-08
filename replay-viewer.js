@@ -41,11 +41,13 @@ async function loadData() {
             return a.toLowerCase().localeCompare(b.toLowerCase());
         });
 
-        // Update player1Select
+        // Update player select
         playerTags.forEach(tag => {
-            const option = document.createElement("option");
-            option.innerHTML = tag;
-            player1Select.appendChild(option);
+            for (const select of [player1TagSelect, player2TagSelect]) {
+                const option = document.createElement("option");
+                option.innerHTML = tag;
+                select.appendChild(option);
+            }
         });
     } catch (error) {
         console.error('Error loading data:', error);
@@ -240,11 +242,51 @@ function updatePagination(paginationContainer) {
     );
 }
 
+function getSearchableMatch(replay, searchTerm) {
+    if (!searchTerm) return true;
+
+    const searchPieces = searchTerm.toLowerCase().split(/\s+/);
+
+    if (!replay.player1 || !replay.player2) return false;
+
+    const searchableText = `${replay.player1} ${replay.player2} ${(replay.player1Characters || []).join(' ')} ${(replay.player2Characters || []).join(' ')} ${replay.tournament}`.toLowerCase();
+
+    return searchPieces.every(piece => {
+        // Check aliases
+        const aliases = getPlayerAliases(piece);
+        if (aliases.length > 0) {
+            return aliases.some(alias => {
+                const lowerAlias = alias.toLowerCase();
+                return replay.player1.toLowerCase() === lowerAlias ||
+                       replay.player2.toLowerCase() === lowerAlias ||
+                       searchableText.includes(lowerAlias);
+            });
+        }
+
+        // Check if it's a character
+        if (characterIcons[piece]) {
+            const regex = new RegExp(`\\b${piece}\\b`);
+            return regex.test(searchableText);
+        }
+
+        // Default search
+        return searchableText.includes(piece);
+    });
+}
+
+function getPlayerTagMatch(replay, playerTag) {
+    if (!playerTag) return true;
+    if (!replay.player1 || !replay.player2) return false;
+    return (replay.player1 == playerTag) || (replay.player2 == playerTag);
+}
+
 // Search functionality
 function performSearch() {
     const searchTerm = searchInput.value.trim();
+    const player1TagTerm = player1TagSelect.value;
+    const player2TagTerm = player2TagSelect.value;
 
-    if (!searchTerm) {
+    if (!searchTerm && !player1TagTerm && !player2TagTerm) {
         displayReplays(replayData);
         return;
     }
@@ -254,34 +296,11 @@ function performSearch() {
     setTimeout(() => {
         loadingMessage.style.display = 'none';
 
-        const searchPieces = searchTerm.toLowerCase().split(/\s+/);
-
         const filtered = replayData.filter(replay => {
-            if (!replay.player1 || !replay.player2) return false;
-
-            const searchableText = `${replay.player1} ${replay.player2} ${(replay.player1Characters || []).join(' ')} ${(replay.player2Characters || []).join(' ')} ${replay.tournament}`.toLowerCase();
-
-            return searchPieces.every(piece => {
-                // Check aliases
-                const aliases = getPlayerAliases(piece);
-                if (aliases.length > 0) {
-                    return aliases.some(alias => {
-                        const lowerAlias = alias.toLowerCase();
-                        return replay.player1.toLowerCase() === lowerAlias ||
-                               replay.player2.toLowerCase() === lowerAlias ||
-                               searchableText.includes(lowerAlias);
-                    });
-                }
-
-                // Check if it's a character
-                if (characterIcons[piece]) {
-                    const regex = new RegExp(`\\b${piece}\\b`);
-                    return regex.test(searchableText);
-                }
-
-                // Default search
-                return searchableText.includes(piece);
-            });
+            const searchMatch = getSearchableMatch(replay, searchTerm);
+            const player1TagMatch = getPlayerTagMatch(replay, player1TagTerm);
+            const player2TagMatch = getPlayerTagMatch(replay, player2TagTerm);
+            return searchMatch && player1TagMatch && player2TagMatch;
         });
 
         displayReplays(filtered);
@@ -352,7 +371,8 @@ let currentSearchResults = [];
 // DOM elements
 const searchInput = document.getElementById('replaySearch');
 const searchButton = document.getElementById('searchButton');
-const player1Select = document.getElementById('player1');
+const player1TagSelect = document.getElementById('player1Tag');
+const player2TagSelect = document.getElementById('player2Tag');
 const resultsContainer = document.getElementById('replaysResults');
 const paginationTopContainer = document.getElementById('paginationTop');
 const paginationBottomContainer = document.getElementById('paginationBottom');
