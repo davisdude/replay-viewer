@@ -34,11 +34,14 @@ async function loadData() {
         // Get unique tournaments
         tournamentsSet = new Set([]);
         replayData.forEach(replay => {
-            tournamentsSet.add(replay.tournament);
+            if ("tournamentShort" in replay)
+                tournamentsSet.add(replay.tournamentShort);
+            //if (!("tournamentShort" in replay))
+            //    tournamentsSet.add(replay.tournament);
         });
-        tournamentNames = Array.from(tournamentsSet).sort((a, b) => {
-            return a.toLowerCase().localeCompare(b.toLowerCase());
-        });
+        tournamentNames = Array.from(tournamentsSet).sort(
+            new Intl.Collator([], {numeric: true}).compare
+        );
 
         // Update tournament select
         tournamentNames.forEach(tournament => {
