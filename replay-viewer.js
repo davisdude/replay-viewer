@@ -277,20 +277,19 @@ function getSearchableMatch(replay, searchTerm) {
     });
 }
 
-function getPlayerMatch(replay, playerTag, characters) {
-    if (!playerTag && (characters.length == 0)) return true;
-    if (!replay.player1 || !replay.player2) return false;
+function getPlayerMatch(replay, playerTag, character, skip) {
+    if (!playerTag && !character) return [true, 0];
+    if (!replay.player1 || !replay.player2) return [false, 0];
 
     const player1TagMatch = playerTag ? (replay.player1 == playerTag) : true;
     const player2TagMatch = playerTag ? (replay.player2 == playerTag) : true;
 
-    let searchChars = new Set(characters);
-    let player1Chars = new Set(replay.player1Characters);
-    let player2Chars = new Set(replay.player2Characters);
-    const player1CharMatch = (characters.length != 0) ? searchChars.intersection(player1Chars).size > 0 : true;
-    const player2CharMatch = (characters.length != 0) ? searchChars.intersection(player2Chars).size > 0 : true;
+    const player1CharMatch = replay.player1Characters.includes(character);
+    const player2CharMatch = replay.player2Characters.includes(character);
 
-    return (player1TagMatch && player1CharMatch) || (player2TagMatch && player2CharMatch);
+    if (player1TagMatch && player1CharMatch && !skip.includes(1)) return [true, 1];
+    if (player2TagMatch && player2CharMatch && !skip.includes(2)) return [true, 2];
+    return [false, 0]
 }
 
 // Search functionality
@@ -298,10 +297,10 @@ function performSearch() {
     const searchTerm = searchInput.value.trim();
     const player1TagTerm = player1TagSelect.value;
     const player2TagTerm = player2TagSelect.value;
-    const player1Characters = Array.from(player1CharacterSelect.selectedOptions).map(({ value }) => value);
-    const player2Characters = Array.from(player2CharacterSelect.selectedOptions).map(({ value }) => value);
+    const player1Character = player1CharacterSelect.value;
+    const player2Character = player2CharacterSelect.value;
 
-    if (!searchTerm && !player1TagTerm && !player2TagTerm && (player1Characters.length == 0) && (player2Characters.length == 0)) {
+    if (!searchTerm && !player1TagTerm && !player2TagTerm && !player1Character && !player2Characters) {
         displayReplays(replayData);
         return;
     }
@@ -313,8 +312,12 @@ function performSearch() {
 
         const filtered = replayData.filter(replay => {
             const searchMatch = getSearchableMatch(replay, searchTerm);
-            const player1Match = getPlayerMatch(replay, player1TagTerm, player1Characters);
-            const player2Match = getPlayerMatch(replay, player2TagTerm, player2Characters);
+            const [player1Match, player1MatchedPlayer] = getPlayerMatch(
+                replay, player1TagTerm, player1Character, []
+            );
+            const [player2Match, player2MatchedPlayer] = getPlayerMatch(
+                replay, player2TagTerm, player2Character, [player1MatchedPlayer]
+            );
             return searchMatch && player1Match && player2Match;
         });
 
