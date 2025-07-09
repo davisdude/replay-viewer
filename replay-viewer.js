@@ -31,6 +31,22 @@ async function loadData() {
             return dateB - dateA;
         });
 
+        // Get unique tournaments
+        tournamentsSet = new Set([]);
+        replayData.forEach(replay => {
+            tournamentsSet.add(replay.tournament);
+        });
+        tournamentNames = Array.from(tournamentsSet).sort((a, b) => {
+            return a.toLowerCase().localeCompare(b.toLowerCase());
+        });
+
+        // Update tournament select
+        tournamentNames.forEach(tournament => {
+            const option = document.createElement("option");
+            option.innerHTML = tournament;
+            tournamentSelect.appendChild(option);
+        });
+
         // Get unique player tags
         playerTagsSet = new Set([]);
         replayData.forEach(replay => {
@@ -43,19 +59,19 @@ async function loadData() {
 
         // Update player select
         playerTags.forEach(tag => {
-            for (const select of [player1TagSelect, player2TagSelect]) {
+            for (const selecter of [player1TagSelect, player2TagSelect]) {
                 const option = document.createElement("option");
                 option.innerHTML = tag;
-                select.appendChild(option);
+                selecter.appendChild(option);
             }
         });
 
         // Update character select
         for (const character of Object.keys(characterIcons)) {
-            for (const select of [player1CharacterSelect, player2CharacterSelect]) {
+            for (const selecter of [player1CharacterSelect, player2CharacterSelect]) {
                 const option = document.createElement("option");
                 option.innerHTML = character;
-                select.appendChild(option);
+                selecter.appendChild(option);
             }
         };
     } catch (error) {
@@ -389,6 +405,7 @@ let currentSearchResults = [];
 // DOM elements
 const searchInput = document.getElementById('replaySearch');
 const searchButton = document.getElementById('searchButton');
+const tournamentSelect = document.getElementById('tournament');
 const player1TagSelect = document.getElementById('player1Tag');
 const player2TagSelect = document.getElementById('player2Tag');
 const player1CharacterSelect = document.getElementById('player1Character');
