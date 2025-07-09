@@ -1,10 +1,13 @@
 import argparse
 import datetime
 import json
+import pprint
 import re
+import sys
 import time
 
 from gql.transport.exceptions import TransportServerError
+from pytubefix import Playlist
 
 import startgg_gql
 
@@ -77,10 +80,44 @@ def get_vod_data(set_data, tournament_name, zone_info):
         "tags": [],
     }
 
-def process_url(url):
-    print(f"Processing {url}")
+def normalize(string):
+    return re.sub(r'[^a-z0-9]', '', string.lower())
+
+def find_matching_youtube_video(set_data, playlist_urls):
+    if not set_data["slots"][0]["entrant"]:
+        return None
+    if not set_data["slots"][1]["entrant"]:
+        return None
+    player1 = set_data["slots"][0]["entrant"]["participants"][0]["gamerTag"]
+    player2 = set_data["slots"][1]["entrant"]["participants"][0]["gamerTag"]
+    round_text = set_data["fullRoundText"]
+    p1_safe_name = normalize(player1)
+    p2_safe_name = normalize(player2)
+    match_url = None
+    url_indices_to_remove = []
+    for video_index, video_data in enumerate(playlist_urls):
+        if video_data is None:
+            continue
+        video_title, video_url = video_data
+        video_title_safe = normalize(video_title)
+        if (p1_safe_name in video_title_safe) and (p2_safe_name in video_title_safe):
+            # Prompts for input
+            print(f"Found potential match for '{player1}' vs '{player2}' ({round_text}): {video_title}")
+            prompt = input("Use? (y/n/remove): ")
+            if prompt.lower().startswith("y"):
+                match_url = video_url
+                url_indices_to_remove.append(video_index)
+                break
+            elif prompt.lower().startswith("r"):
+                url_indices_to_remove.append(video_index)
+    for url_index in sorted(url_indices_to_remove, reverse=True):
+        del playlist_urls[url_index]
+    return match_url
+
+def process_event(startgg_url, playlist_urls):
+    print(f"Processing {startgg_url}")
     data = []
-    slugs = get_slugs_from_url(url)
+    slugs = get_slugs_from_url(startgg_url)
     if not slugs:
         print("Could not get slugs")
         return []
@@ -95,6 +132,12 @@ def process_url(url):
         try:
             set_data = startgg_gql.get_set_data(client, set_id)
             vod_data = get_vod_data(set_data, tournament_name, timezone)
+            if not vod_data:
+                # Try to get video from playlist
+                url = find_matching_youtube_video(set_data, playlist_urls)
+                if url:
+                    set_data["vodUrl"] = url
+                    vod_data = get_vod_data(set_data, tournament_name, timezone)
             if vod_data:
                 vod_data["id"] = len(data)
                 data.append(vod_data)
@@ -109,16 +152,37 @@ def process_url(url):
                 raise
     return data
 
-def process_urls(urls, file):
+def process_urls(startgg_urls, playlist_urls, file):
+    if len(playlist_urls) == 0:
+        playlist_urls = [[None]] * len(startgg_urls)
+    elif len(startgg_urls) != len(startgg_urls):
+        print("Not enough playlist URLs!")
+        sys.exit(1)
+
+    for i, playlist_url in enumerate(playlist_urls):
+        if not playlist_url:
+            playlist_urls[i] = [None]
+            continue
+        try:
+            playlist = Playlist(playlist_url)
+            playlist_urls[i] = [(vid.title, vid.watch_url) for vid in playlist.videos]
+        except Exception as e:
+            print(f"Failed to process playlist '{playlist_url}': {e}")
+            sys.exit(1)
+
     data = []
-    for url in urls:
-        data.extend(process_url(url))
+    for startgg_url, playlist_url in zip(startgg_urls, playlist_urls):
+        data.extend(process_event(startgg_url, playlist_url))
+        if playlist_url:
+            print(f"Warning - videos left in playlist: {pprint.pformat(playlist_url)}")
+
     json.dump(data, file, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("urls", nargs="+", type=str)
+    parser.add_argument("startgg_urls", nargs="+", type=str)
+    parser.add_argument("--playlist-urls", nargs="*", type=str)
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
     args = parser.parse_args()
 
-    process_urls(args.urls, args.out)
+    process_urls(args.startgg_urls, args.playlist_urls, args.out)

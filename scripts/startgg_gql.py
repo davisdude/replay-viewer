@@ -45,6 +45,7 @@ query SetEntrants($setId: ID!) {
     startAt
     startedAt
     createdAt
+    fullRoundText
     vodUrl
     slots {
       id

@@ -12,28 +12,28 @@ def merge_json(parent_data, child_data):
             parent_data[yt_id] = {"id": max_id}
             max_id += 1
         parent_vod = parent_data[yt_id]
-        manual_items = ["player1", "player2"]
-        # Swaps players/characters to match start.gg data
-        if (
-                (("player1" in parent_vod) and ("player2" in parent_vod))
-            and (child_vod["player1"] != parent_vod["player1"])
-        ):
-            tmp_player = parent_vod["player1"]
-            tmp_characters = child_vod["player2Characters"] or parent_vod["player1Characters"]
-            parent_vod["player1"] = parent_vod["player2"]
-            parent_vod["player2"] = tmp_player
-            parent_vod["player1Characters"] = child_vod["player1Characters"] or parent_vod["player2Characters"]
-            parent_vod["player2Characters"] = tmp_characters
-        else:
-            for item in manual_items:
-                parent_vod[item] = child_vod[item]
+        # TODO: This doesn't properly account for tag differences (non-swaps)
+        ##manual_items = ["player1", "player2"]
+        ## Swaps players/characters to match start.gg data
+        #if (
+        #        (("player1" in parent_vod) and ("player2" in parent_vod))
+        #    and (child_vod["player1"] != parent_vod["player1"])
+        #):
+        #    tmp_characters = child_vod["player2Characters"] or parent_vod["player1Characters"]
+        #    parent_vod["player1"] = child_vod["player1"]
+        #    parent_vod["player2"] = child_vod["player2"]
+        #    parent_vod["player1Characters"] = child_vod["player1Characters"] or parent_vod["player2Characters"]
+        #    parent_vod["player2Characters"] = tmp_characters
+        #else:
+        #    for item in manual_items:
+        #        parent_vod[item] = child_vod[item]
         for k, v in child_vod.items():
             if k == "id":
                 continue
             if not v:
                 continue
-            if k in manual_items:
-                continue
+            #if k in manual_items:
+            #    continue
             parent_vod[k] = v
     return list(parent_data.values())
 
