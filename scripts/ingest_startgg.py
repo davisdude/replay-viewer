@@ -84,6 +84,10 @@ def normalize(string):
     return re.sub(r'[^a-z0-9]', '', string.lower())
 
 def find_matching_youtube_video(set_data, playlist_urls):
+    if not set_data["slots"][0]["entrant"]:
+        return None
+    if not set_data["slots"][1]["entrant"]:
+        return None
     player1 = set_data["slots"][0]["entrant"]["participants"][0]["gamerTag"]
     player2 = set_data["slots"][1]["entrant"]["participants"][0]["gamerTag"]
     round_text = set_data["fullRoundText"]
