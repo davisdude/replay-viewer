@@ -80,6 +80,15 @@ query SetEntrants($setId: ID!) {
 }
 """)
 
+SET_VOD_MUTATION = gql("""
+mutation ($setId: ID!, $vodUrl: String) {
+  updateVodUrl(setId: $setId, vodUrl: $vodUrl) {
+    id
+  }
+}
+""")
+
+
 def sleep(f):
     def _sleep(*args, **kwargs):
         result = f(*args, **kwargs)
@@ -114,6 +123,11 @@ def get_set_data(client, set_id):
     params = {"setId": set_id}
     result = client.execute(GET_SET_DATA_QUERY, variable_values=params)
     return result["set"]
+
+@sleep
+def set_vod(client, set_id, vod_url):
+    params = {"setId": set_id, "vodUrl": vod_url}
+    client.execute(SET_VOD_MUTATION, variable_values=params)
 
 def get_client(api_key=None):
     api_key = api_key or STARTGG_API_KEY
