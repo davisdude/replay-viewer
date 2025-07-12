@@ -138,6 +138,10 @@ def process_event(startgg_url, playlist_urls):
                 if url:
                     set_data["vodUrl"] = url
                     vod_data = get_vod_data(set_data, tournament_name, timezone)
+                    try:
+                        startgg_gql.set_vod(client, set_id, url)
+                    except Exception as e:
+                        print(f"Failed to assign video: {e}")
             if vod_data:
                 vod_data["id"] = len(data)
                 data.append(vod_data)
@@ -161,7 +165,7 @@ def process_urls(startgg_urls, playlist_urls, file):
 
     for i, playlist_url in enumerate(playlist_urls):
         if not playlist_url:
-            playlist_urls[i] = [None]
+            playlist_urls[i] = []
             continue
         try:
             playlist = Playlist(playlist_url)
@@ -181,7 +185,7 @@ def process_urls(startgg_urls, playlist_urls, file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("startgg_urls", nargs="+", type=str)
-    parser.add_argument("--playlist-urls", nargs="*", type=str)
+    parser.add_argument("--playlist-urls", nargs="*", type=str, default=[[]])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
     args = parser.parse_args()
 
