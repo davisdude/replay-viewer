@@ -177,6 +177,7 @@ def process_urls(slug: str, playlist_urls: list[str], file, api_key: str):
         try:
             playlist = Playlist(playlist_url)
             playlist_urls[i] = [(vid.title, vid.watch_url) for vid in playlist.videos]
+            print(f"{len(playlist_urls[i])} videos found in {playlist_url}")
         except Exception as e:
             print(f"Failed to process playlist {playlist_url}: {e}")
             sys.exit(1)
