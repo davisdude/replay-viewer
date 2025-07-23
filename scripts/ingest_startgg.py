@@ -49,24 +49,24 @@ def get_youtube_id_from_url(url: str):
         return None
     return match.group("id")
 
-def get_vod_data(set, tournament_name: str, date: str, video_url: str):
-    if (len(set["entrant_1_gamer_tags"]) != 1 or len(set["entrant_2_gamer_tags"]) != 1):
+def get_vod_data(setObj, tournament_name: str, date: str, video_url: str):
+    if (len(setObj["entrant_1_gamer_tags"]) != 1 or len(setObj["entrant_2_gamer_tags"]) != 1):
         return None
 
     youtube_id = get_youtube_id_from_url(video_url)
     entrant_1_characters: list[str] = []
-    for character_id in set["entrant_1_character_ids"]:
+    for character_id in setObj["entrant_1_character_ids"]:
         entrant_1_characters.append(id_to_character[character_id])
     entrant_2_characters: list[str] = []
-    for character_id in set["entrant_2_character_ids"]:
+    for character_id in setObj["entrant_2_character_ids"]:
         entrant_2_characters.append(id_to_character[character_id])
     return {
         "youtubeId": youtube_id,
         "date": date,
         "tournament": tournament_name,
-        "player1": set["entrant_1_gamer_tags"][0],
+        "player1": setObj["entrant_1_gamer_tags"][0],
         "player1Characters": entrant_1_characters,
-        "player2": set["entrant_2_gamer_tags"][0],
+        "player2": setObj["entrant_2_gamer_tags"][0],
         "player2Characters": entrant_2_characters,
         "tags": [],
     }
@@ -103,11 +103,12 @@ def get_tournament_name_sets_and_timezone(slug: str):
                     "entrant_2_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant2Id"]],
                     "entrant_1_character_ids": setObj.get("entrant1CharacterIds", []),
                     "entrant_2_character_ids": setObj.get("entrant2CharacterIds", []),
+                    "vod_url": setObj["vodUrl"]
                 })
     return name, sets, date
 
-def process_tournament(slug: str, playlist_urls: list[tuple[str, str]], api_key: str):
-    print(f"Processing {slug}")
+def set_tournament_vod_urls(slug: str, playlist_urls: list[tuple[str, str]], api_key: str):
+    print(f"Setting VOD URLs for {slug}")
     data = []
     name, sets, date = get_tournament_name_sets_and_timezone(slug)
 
@@ -171,34 +172,45 @@ def process_tournament(slug: str, playlist_urls: list[tuple[str, str]], api_key:
     startgg_gql.batch_set_vods(startgg_gql.get_client(api_key), requests=requests)
     return data
 
-def process_urls(slug: str, playlist_urls: list[str], file, api_key: str):
-    if len(playlist_urls) == 0:
-        print("Not enough playlist URLs!")
-        sys.exit(1)
+def get_tournament_vod_urls(slug: str):
+    print(f"Getting VOD URLs from {slug}")
+    data = []
+    name, sets, date = get_tournament_name_sets_and_timezone(slug)
+    for setObj in sets:
+        video_url = setObj["vod_url"]
+        if video_url is not None:
+            vod_data = get_vod_data(setObj, name, date, video_url)
+            if vod_data is not None:
+                data.append(vod_data)
+    print(f"{len(data)} VOD URLs found in {slug}")
+    return data
 
-    for i, playlist_url in enumerate(playlist_urls):
-        if not playlist_url:
-            playlist_urls[i] = []
-            continue
+def process_urls(slug: str, playlist_urls: list[str], file, api_key: str):
+    playlistsVideos: list[list[tuple[str, str]]] = []
+    for playlist_url in playlist_urls:
         print(f"Processing {playlist_url}")
         try:
             playlist = Playlist(playlist_url)
-            playlist_urls[i] = [(vid.title, vid.watch_url) for vid in playlist.videos]
-            print(f"{len(playlist_urls[i])} videos found in {playlist_url}")
+            playlistVideos = [(vid.title, vid.watch_url) for vid in playlist.videos]
+            playlistsVideos.append(playlistVideos)
+            print(f"{len(playlistVideos)} videos found in {playlist_url}")
         except Exception as e:
             print(f"Failed to process playlist {playlist_url}: {e}")
             sys.exit(1)
 
     data = []
-    for playlist_url in playlist_urls:
-        data.extend(process_tournament(slug, playlist_url, api_key))
+    if len(playlistsVideos) == 0:
+        data.extend(get_tournament_vod_urls(slug))
+    else:
+        for playlistVideos in playlistsVideos:
+            data.extend(set_tournament_vod_urls(slug, playlistVideos, api_key))
 
     json.dump(data, file, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("slug", type=str)
-    parser.add_argument("--playlist-urls", nargs="*", type=str, default=[[]])
+    parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
     parser.add_argument("--api_key", type=str)
     args = parser.parse_args()
