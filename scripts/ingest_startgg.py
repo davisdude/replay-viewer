@@ -212,7 +212,7 @@ if __name__ == "__main__":
     parser.add_argument("slug", type=str)
     parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
-    parser.add_argument("--api_key", type=str)
+    parser.add_argument("--api-key", type=str)
     args = parser.parse_args()
 
     process_urls(args.slug, args.playlist_urls, args.out, args.api_key)
