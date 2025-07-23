@@ -7,6 +7,7 @@ import requests
 import sys
 
 from pytubefix import Playlist
+from typing import cast
 from zoneinfo import ZoneInfo
 
 import startgg_gql
@@ -79,32 +80,33 @@ def get_tournament_name_sets_and_timezone(slug: str):
     time = tournament_response["entities"]["tournament"]["startAt"]
     timezone = tournament_response["entities"]["tournament"]["timezone"]
     date = datetime.datetime.fromtimestamp(time, tz=ZoneInfo(timezone)).strftime("%Y-%m-%d")
-    phase_id_to_name = dict[str, str]()
-    for phase in tournament_response["entities"]["phase"]:
-        phase_id_to_name[phase["id"]] = phase["name"]
+    phase_id_to_name = {
+        phase["id"]: phase["name"]
+        for phase in tournament_response["entities"]["phase"]
+    }
     sets = []
     for group in tournament_response["entities"]["groups"]:
         group_response = requests.get(f"https://api.start.gg/phase_group/{group["id"]}?expand[]=sets&expand[]=entrants").json()
-        entrant_id_to_gamer_tags = dict[int, list[str]]()
-        for entrant in group_response["entities"]["entrants"]:
-            gamerTags: list[str] = []
-            for key in entrant["mutations"]["participants"]:
-                gamerTags.append(entrant["mutations"]["participants"][key]["gamerTag"])
-            entrant_id_to_gamer_tags[entrant["id"]] = gamerTags
-        for set in group_response["entities"]["sets"]:
-            if (set["entrant1Id"] is not None and set["entrant2Id"] is not None):
+        entrant_id_to_gamer_tags = {
+            entrant["id"]: [
+                participant["gamerTag"]
+                for participant in entrant["mutations"]["participants"].values()
+            ] for entrant in group_response["entities"]["entrants"]
+        }
+        for setObj in group_response["entities"]["sets"]:
+            if (setObj["entrant1Id"] is not None and setObj["entrant2Id"] is not None and setObj["unreachable"] != True):
                 sets.append({
-                    "id": set["id"],
-                    "full_round_text": set["fullRoundText"],
-                    "phase_name": phase_id_to_name[set["phaseId"]],
-                    "entrant_1_gamer_tags": entrant_id_to_gamer_tags[set["entrant1Id"]],
-                    "entrant_2_gamer_tags": entrant_id_to_gamer_tags[set["entrant2Id"]],
-                    "entrant_1_character_ids": set["entrant1CharacterIds"] if "entrant1CharacterIds" in set else [],
-                    "entrant_2_character_ids": set["entrant2CharacterIds"] if "entrant2CharacterIds" in set else [],
+                    "id": setObj["id"],
+                    "full_round_text": setObj["fullRoundText"],
+                    "phase_name": phase_id_to_name[setObj["phaseId"]],
+                    "entrant_1_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant1Id"]],
+                    "entrant_2_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant2Id"]],
+                    "entrant_1_character_ids": setObj.get("entrant1CharacterIds", []),
+                    "entrant_2_character_ids": setObj.get("entrant2CharacterIds", []),
                 })
     return name, sets, date
 
-def process_tournament(slug: str, playlist_urls: list[str], api_key: str):
+def process_tournament(slug: str, playlist_urls: list[tuple[str, str]], api_key: str):
     print(f"Processing {slug}")
     data = []
     name, sets, date = get_tournament_name_sets_and_timezone(slug)
@@ -113,41 +115,46 @@ def process_tournament(slug: str, playlist_urls: list[str], api_key: str):
     current_playlist_urls = playlist_urls
     unmatched_playlist_urls = []
     while len(current_playlist_urls):
-        next_playlist_urls: list[str] = []
+        next_playlist_urls: list[tuple[str, str]] = []
         for playlist_url in current_playlist_urls:
             if playlist_url is None:
                 continue
             video_title, video_url = playlist_url
             video_title_safe = normalize(video_title)
-            phase_matching_sets = []
+            exact_matching_sets = []
             matching_sets = []
-            for set in sets:
-                all_gamer_tags_found = True
-                for gamer_tag in set["entrant_1_gamer_tags"] + set["entrant_2_gamer_tags"]:
-                    if normalize(gamer_tag) not in video_title_safe:
-                        all_gamer_tags_found = False
-                        break
-                if all_gamer_tags_found and (normalize(set["full_round_text"]) in video_title_safe):
-                    if normalize(set["phase_name"]) in video_title_safe:
-                        phase_matching_sets.append(set)
+            for setObj in sets:
+                all_gamer_tags_found = all([
+                    normalize(gamer_tag) in video_title_safe
+                    for gamer_tag in setObj["entrant_1_gamer_tags"] + setObj["entrant_2_gamer_tags"]
+                ])
+                if all_gamer_tags_found:
+                    full_round_text = cast(str, setObj["full_round_text"])
+                    full_round_text_found = normalize(setObj["full_round_text"]) in video_title_safe
+                    abbrev_round_text = "".join(re.findall('([A-Z]|[0-9])', full_round_text))
+                    abbrev_round_text_found = normalize(abbrev_round_text) in video_title_safe
+                    any_round_found = full_round_text_found or abbrev_round_text_found
+                    phase_name_found = normalize(setObj["phase_name"]) in video_title_safe
+                    if any_round_found and phase_name_found:
+                        exact_matching_sets.append(setObj)
                     else:
-                        matching_sets.append(set)
-            if len(phase_matching_sets) == 1:
-                set_id_to_video_url[phase_matching_sets[0]["id"]] = video_url
-                vod_data = get_vod_data(phase_matching_sets[0], name, date, video_url)
+                        matching_sets.append(setObj)
+            if len(exact_matching_sets) == 1:
+                set_id_to_video_url[exact_matching_sets[0]["id"]] = video_url
+                vod_data = get_vod_data(exact_matching_sets[0], name, date, video_url)
                 if vod_data is not None:
                     data.append(vod_data)
-                sets.remove(phase_matching_sets[0])
-                print(f"matched with phase: {video_title}")
-            elif len(phase_matching_sets) > 1:
+                sets.remove(exact_matching_sets[0])
+                print(f"matched exactly: {video_title}")
+            elif len(exact_matching_sets) > 1:
                 next_playlist_urls.append(playlist_url)
             elif len(matching_sets) == 1:
                 set_id_to_video_url[matching_sets[0]["id"]] = video_url
                 vod_data = get_vod_data(matching_sets[0], name, date, video_url)
                 if vod_data is not None:
                     data.append(vod_data)
-                sets.remove(phase_matching_sets[0])
-                print(f"matched without phase: {video_title}")
+                sets.remove(matching_sets[0])
+                print(f"matched: {video_title}")
             elif len(matching_sets) > 1:
                 next_playlist_urls.append(playlist_url)
             else:
@@ -155,7 +162,7 @@ def process_tournament(slug: str, playlist_urls: list[str], api_key: str):
         if len(current_playlist_urls) == len(next_playlist_urls):
             print(f"videos with multiple matches: {pprint.pformat(next_playlist_urls)}")
             break
-        current_playlist_urls = list(next_playlist_urls)
+        current_playlist_urls = next_playlist_urls
     if len(unmatched_playlist_urls) > 0:
         print(f"unmatched videos: {pprint.pformat(unmatched_playlist_urls)}")
     requests = []
