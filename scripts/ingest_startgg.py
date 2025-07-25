@@ -74,7 +74,7 @@ def get_vod_data(setObj, tournament_name: str, date: str, video_url: str):
 def normalize(string: str):
     return re.sub(r'[^a-z0-9!#$%&\'+,;=@^`{}~]', '', string.lower())
 
-def get_tournament_name_sets_and_timezone(slug: str):
+def get_tournament_sets_name_and_date(slug: str):
     tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
     name = tournament_response["entities"]["tournament"]["name"]
     time = tournament_response["entities"]["tournament"]["startAt"]
@@ -105,7 +105,7 @@ def get_tournament_name_sets_and_timezone(slug: str):
                     "entrant_2_character_ids": setObj.get("entrant2CharacterIds", []),
                     "vod_url": setObj["vodUrl"]
                 })
-    return name, sets, date
+    return sets, name, date
 
 def get_sets_vod_urls(sets: list, tournament_name: str, tournament_date: str):
     data = []
@@ -117,84 +117,99 @@ def get_sets_vod_urls(sets: list, tournament_name: str, tournament_date: str):
                 data.append(vod_data)
     return data
 
-def set_tournament_vod_urls(slug: str, playlist_videos: list[tuple[str, str]], api_key: str):
-    print(f"Setting VOD URLs for {slug}")
-    data = []
-    name, sets, date = get_tournament_name_sets_and_timezone(slug)
-
-    set_id_to_video_url = dict[str, str]()
-    current_playlist_videos = playlist_videos
-    unmatched_playlist_videos = []
-    while len(current_playlist_videos):
-        next_playlist_urls: list[tuple[str, str]] = []
-        for playlist_url in current_playlist_videos:
-            if playlist_url is None:
-                continue
-            video_title, video_url = playlist_url
-            video_title_safe = normalize(video_title)
-            matching_all_sets = []
-            matching_tags_sets = []
-            for setObj in sets:
-                all_gamer_tags_found = all([
-                    normalize(gamer_tag) in video_title_safe
-                    for gamer_tag in setObj["entrant_1_gamer_tags"] + setObj["entrant_2_gamer_tags"]
-                ])
-                if all_gamer_tags_found:
-                    full_round_text = cast(str, setObj["full_round_text"])
-                    full_round_text_found = normalize(setObj["full_round_text"]) in video_title_safe
-                    abbrev_round_text = "".join(re.findall('([A-Z]|[0-9])', full_round_text))
-                    abbrev_round_text_found = normalize(abbrev_round_text) in video_title_safe
-                    any_round_found = full_round_text_found or abbrev_round_text_found
-                    phase_name_found = normalize(setObj["phase_name"]) in video_title_safe
-                    if any_round_found and phase_name_found:
-                        matching_all_sets.append(setObj)
-                    else:
-                        matching_tags_sets.append(setObj)
-            if len(matching_all_sets) == 1:
-                set_id_to_video_url[matching_all_sets[0]["id"]] = video_url
-                vod_data = get_vod_data(matching_all_sets[0], name, date, video_url)
-                if vod_data is not None:
-                    data.append(vod_data)
-                sets.remove(matching_all_sets[0])
-                print(f"matched tags, round, and phase: {video_title}")
-            elif len(matching_all_sets) > 1:
-                next_playlist_urls.append(playlist_url)
-            elif len(matching_tags_sets) == 1:
-                set_id_to_video_url[matching_tags_sets[0]["id"]] = video_url
-                vod_data = get_vod_data(matching_tags_sets[0], name, date, video_url)
-                if vod_data is not None:
-                    data.append(vod_data)
-                sets.remove(matching_tags_sets[0])
-                print(f"matched tags: {video_title}")
-            elif len(matching_tags_sets) > 1:
-                next_playlist_urls.append(playlist_url)
+def get_matching_sets(video_title: str, sets: list):
+    video_title_safe = normalize(video_title)
+    exact_match_sets = []
+    only_tags_match_sets = []
+    for setObj in sets:
+        all_gamer_tags_found = all([
+            normalize(gamer_tag) in video_title_safe
+            for gamer_tag in setObj["entrant_1_gamer_tags"] + setObj["entrant_2_gamer_tags"]
+        ])
+        if all_gamer_tags_found:
+            full_round_text = cast(str, setObj["full_round_text"])
+            full_round_text_found = normalize(setObj["full_round_text"]) in video_title_safe
+            abbrev_round_text = "".join(re.findall('([A-Z]|[0-9])', full_round_text))
+            abbrev_round_text_found = normalize(abbrev_round_text) in video_title_safe
+            any_round_found = full_round_text_found or abbrev_round_text_found
+            phase_name_found = normalize(setObj["phase_name"]) in video_title_safe
+            if any_round_found and phase_name_found:
+                exact_match_sets.append(setObj)
             else:
-                unmatched_playlist_videos.append(playlist_url)
-        if len(current_playlist_videos) == len(next_playlist_urls):
-            print(f"videos with multiple matches: {pprint.pformat(next_playlist_urls)}")
+                only_tags_match_sets.append(setObj)
+    return exact_match_sets, only_tags_match_sets
+
+def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, date: str):
+    data = []
+    set_video_urls: list[tuple[any, str]] = []
+    unmatched_videos: list[tuple[str, str]] = []
+
+    current_videos = videos
+    while len(current_videos) > 0:
+        next_videos: list[tuple[str, str]] = []
+        for video in current_videos:
+            video_title, video_url = video
+            exact_match_sets, only_tags_match_sets = get_matching_sets(video_title, sets)
+            if len(exact_match_sets) == 1:
+                set_video_urls.append((exact_match_sets[0], video_url))
+                vod_data = get_vod_data(exact_match_sets[0], name, date, video_url)
+                if vod_data is not None:
+                    data.append(vod_data)
+                sets.remove(exact_match_sets[0])
+                print(f"matched tags, round, and phase: {video_title}")
+            elif len(exact_match_sets) > 1:
+                next_videos.append(video)
+            elif len(only_tags_match_sets) == 1:
+                set_video_urls.append((only_tags_match_sets[0], video_url))
+                vod_data = get_vod_data(only_tags_match_sets[0], name, date, video_url)
+                if vod_data is not None:
+                    data.append(vod_data)
+                sets.remove(only_tags_match_sets[0])
+                print(f"matched tags: {video_title}")
+            elif len(only_tags_match_sets) > 1:
+                next_videos.append(video)
+            else:
+                unmatched_videos.append(video)
+        if len(current_videos) == len(next_videos):
+            print(f"videos with multiple matches: {pprint.pformat(next_videos)}")
             break
-        current_playlist_videos = next_playlist_urls
-    if len(unmatched_playlist_videos) > 0:
-        print(f"unmatched videos: {pprint.pformat(unmatched_playlist_videos)}")
+        current_videos = next_videos
+    if len(unmatched_videos) > 0:
+        print(f"unmatched videos: {pprint.pformat(unmatched_videos)}")
+    return set_video_urls, data
+
+def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool):
+    print(f"Setting VOD URLs for {slug}")
+    sets, name, date = get_tournament_sets_name_and_date(slug)
+    set_video_urls, data = match_videos_to_sets(videos, sets, name, date)
+
     requests = []
-    for set_id in set_id_to_video_url:
-        requests.append(startgg_gql.get_set_vod_request(set_id, set_id_to_video_url[set_id]))
-    startgg_gql.batch_set_vods(startgg_gql.get_client(api_key), requests=requests)
+    for setObj, video_url in set_video_urls:
+        if get_youtube_id_from_url(setObj["vod_url"]) != get_youtube_id_from_url(video_url):
+            requests.append(startgg_gql.get_set_vod_request(setObj["id"], video_url))
+    original_requests_len = len(requests)
+    if dry_run:
+        print(f"{len(requests)} new VOD URLs matched but not set in {slug}")
+    else:
+        while len(requests) > 0:
+            # no rate handling because you'd need 40,000 VODs to exceed
+            startgg_gql.batch_set_vods(startgg_gql.get_client(api_key), requests[:500])
+            requests = requests[500:]
+        print(f"{original_requests_len} new VOD URLs set in {slug}")
 
     existing_data = get_sets_vod_urls(sets, name, date)
-    print(f"{len(data)} VOD URLs set in {slug}")
-    print(f"{len(existing_data)} existing VOD URLs found in {slug}")
+    print(f"{len(existing_data) + len(data) - original_requests_len} existing VOD URLs found in {slug}")
     data.extend(existing_data)
     return data
 
 def get_tournament_vod_urls(slug: str):
     print(f"Getting VOD URLs from {slug}")
-    name, sets, date = get_tournament_name_sets_and_timezone(slug)
+    sets, name, date = get_tournament_sets_name_and_date(slug)
     data = get_sets_vod_urls(sets, name, date)
     print(f"{len(data)} VOD URLs found in {slug}")
     return data
 
-def process_urls(slug: str, playlist_urls: list[str], file, api_key: str):
+def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bool):
     videos: list[tuple[str, str]] = []
     for playlist_url in playlist_urls:
         print(f"Processing {playlist_url}")
@@ -211,7 +226,7 @@ def process_urls(slug: str, playlist_urls: list[str], file, api_key: str):
     if len(videos) == 0:
         data.extend(get_tournament_vod_urls(slug))
     else:
-        data.extend(set_tournament_vod_urls(slug, videos, api_key))
+        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run))
 
     json.dump(data, file, indent=2)
 
@@ -220,7 +235,8 @@ if __name__ == "__main__":
     parser.add_argument("slug", type=str)
     parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
-    parser.add_argument("--api-key", type=str)
+    parser.add_argument("--api-key", type=str, default="")
+    parser.add_argument("--dry-run", type=bool, default=False)
     args = parser.parse_args()
 
-    process_urls(args.slug, args.playlist_urls, args.out, args.api_key)
+    process(args.slug, args.playlist_urls, args.out, args.api_key, args.dry_run)
