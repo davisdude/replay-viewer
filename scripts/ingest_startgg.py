@@ -3,190 +3,240 @@ import datetime
 import json
 import pprint
 import re
+import requests
 import sys
-import time
 
-from gql.transport.exceptions import TransportServerError
 from pytubefix import Playlist
+from typing import cast
+from zoneinfo import ZoneInfo
 
 import startgg_gql
 
-def get_youtube_id_from_url(url):
+id_to_character = {
+    1: "Bowser",
+    2: "Captain Falcon",
+    3: "Donkey Kong",
+    4: "Dr. Mario",
+    5: "Falco",
+    6: "Fox",
+    7: "Ganondorf",
+    8: "Ice Climbers",
+    9: "Jigglypuff",
+    10: "Kirby",
+    11: "Link",
+    12: "Luigi",
+    13: "Mario",
+    14: "Marth",
+    15: "Mewtwo",
+    16: "Mr. Game & Watch",
+    17: "Ness",
+    18: "Peach",
+    19: "Pichu",
+    20: "Pikachu",
+    21: "Roy",
+    22: "Samus",
+    23: "Sheik",
+    24: "Yoshi",
+    25: "Young Link",
+    26: "Zelda",
+    628: "Sheik / Zelda",
+    1744: "Random Character"
+}
+
+def get_youtube_id_from_url(url: str):
     match = re.search(r"(youtu.be/|youtube.com/watch\?v=)(?P<id>.{11})", url)
     if not match:
         return None
     return match.group("id")
 
-def get_slugs_from_url(url):
-    match = re.search(r"start.gg/(?P<event>(?P<tournament>tournament/([^/]+))/event/[^/]+?)(/|$)", url)
-    if not match:
+def get_vod_data(setObj, tournament_name: str, date: str, video_url: str):
+    if (len(setObj["entrant_1_gamer_tags"]) != 1 or len(setObj["entrant_2_gamer_tags"]) != 1):
         return None
-    return match.group("tournament"), match.group("event")
 
-def get_relevant_games(set_data, entrant_id):
-    # Drop irrelevant / missing data
-    return [
-        selection
-        for game in set_data["games"]
-        if (game["selections"] is not None)
-        for selection in game["selections"]
-        if (selection["entrant"]["id"] == entrant_id)
-    ]
-
-
-def get_game_selection_data(set_data, entrant_id):
-    relevant_games = get_relevant_games(set_data, entrant_id)
-    if len(relevant_games) == 0:
-        return None
-    name = relevant_games[0]["entrant"]["participants"][0]["gamerTag"]
-    # Use dict to preserve order
-    chars = {game["character"]["name"]: True for game in relevant_games}
-    return name, list(dict.fromkeys(chars))
-
-def get_vod_data(set_data, tournament_name, zone_info):
-    if set_data["vodUrl"] is None:
-        return None
-    youtube_id = get_youtube_id_from_url(set_data["vodUrl"])
-    time = set_data["startAt"] or set_data["startedAt"] or set_data["createdAt"]
-    date = datetime.datetime.fromtimestamp(time, tz=zone_info).strftime("%Y-%m-%d")
-    if not youtube_id:
-        print(f"Unsupported URL '{set_data['vodUrl']}' for set id {set_data['id']}")
-        return None
-    if len(set_data["slots"]) != 2:
-        print(f"Unsupported format for set id {set_data['id']}")
-        return None
-    if len(set_data["slots"][0]["entrant"]["participants"]) != 1:
-        print(f"Unsupported format for set id {set_data['id']}")
-        return None
-    player_1_name = set_data["slots"][0]["entrant"]["participants"][0]["gamerTag"]
-    player_2_name = set_data["slots"][1]["entrant"]["participants"][0]["gamerTag"]
-    player_1_chars = []
-    player_2_chars = []
-    if set_data["games"] is not None:
-        player_1_data = get_game_selection_data(set_data, set_data["slots"][0]["entrant"]["id"])
-        player_2_data = get_game_selection_data(set_data, set_data["slots"][1]["entrant"]["id"])
-        if player_1_data is not None:
-            player_1_name, player_1_chars = player_1_data
-        if player_2_data is not None:
-            player_2_name, player_2_chars = player_2_data
+    youtube_id = get_youtube_id_from_url(video_url)
+    entrant_1_characters: list[str] = []
+    for character_id in setObj["entrant_1_character_ids"]:
+        entrant_1_characters.append(id_to_character[character_id])
+    entrant_2_characters: list[str] = []
+    for character_id in setObj["entrant_2_character_ids"]:
+        entrant_2_characters.append(id_to_character[character_id])
     return {
         "youtubeId": youtube_id,
         "date": date,
         "tournament": tournament_name,
-        "player1": player_1_name,
-        "player1Characters": player_1_chars,
-        "player2": player_2_name,
-        "player2Characters": player_2_chars,
+        "player1": setObj["entrant_1_gamer_tags"][0],
+        "player1Characters": entrant_1_characters,
+        "player2": setObj["entrant_2_gamer_tags"][0],
+        "player2Characters": entrant_2_characters,
         "tags": [],
     }
 
-def normalize(string):
-    return re.sub(r'[^a-z0-9]', '', string.lower())
+def normalize(string: str):
+    return re.sub(r'[^a-z0-9!#$%&\'+,;=@^`{}~]', '', string.lower())
 
-def find_matching_youtube_video(set_data, playlist_urls):
-    if not set_data["slots"][0]["entrant"]:
-        return None
-    if not set_data["slots"][1]["entrant"]:
-        return None
-    player1 = set_data["slots"][0]["entrant"]["participants"][0]["gamerTag"]
-    player2 = set_data["slots"][1]["entrant"]["participants"][0]["gamerTag"]
-    round_text = set_data["fullRoundText"]
-    p1_safe_name = normalize(player1)
-    p2_safe_name = normalize(player2)
-    match_url = None
-    url_indices_to_remove = []
-    for video_index, video_data in enumerate(playlist_urls):
-        if video_data is None:
-            continue
-        video_title, video_url = video_data
-        video_title_safe = normalize(video_title)
-        if (p1_safe_name in video_title_safe) and (p2_safe_name in video_title_safe):
-            # Prompts for input
-            print(f"Found potential match for '{player1}' vs '{player2}' ({round_text}): {video_title}")
-            prompt = input("Use? (y/n/remove): ")
-            if prompt.lower().startswith("y"):
-                match_url = video_url
-                url_indices_to_remove.append(video_index)
-                break
-            elif prompt.lower().startswith("r"):
-                url_indices_to_remove.append(video_index)
-    for url_index in sorted(url_indices_to_remove, reverse=True):
-        del playlist_urls[url_index]
-    return match_url
+def get_tournament_sets_name_and_date(slug: str):
+    tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
+    name = tournament_response["entities"]["tournament"]["name"]
+    time = tournament_response["entities"]["tournament"]["startAt"]
+    timezone = tournament_response["entities"]["tournament"]["timezone"]
+    date = datetime.datetime.fromtimestamp(time, tz=ZoneInfo(timezone)).strftime("%Y-%m-%d")
+    phase_id_to_name = {
+        phase["id"]: phase["name"]
+        for phase in tournament_response["entities"]["phase"]
+    }
+    sets = []
+    for group in tournament_response["entities"]["groups"]:
+        group_response = requests.get(f"https://api.start.gg/phase_group/{group["id"]}?expand[]=sets&expand[]=entrants").json()
+        entrant_id_to_gamer_tags = {
+            entrant["id"]: [
+                participant["gamerTag"]
+                for participant in entrant["mutations"]["participants"].values()
+            ] for entrant in group_response["entities"]["entrants"]
+        }
+        for setObj in group_response["entities"]["sets"]:
+            if (setObj["entrant1Id"] is not None and setObj["entrant2Id"] is not None and setObj["unreachable"] != True):
+                sets.append({
+                    "id": setObj["id"],
+                    "full_round_text": setObj["fullRoundText"],
+                    "phase_name": phase_id_to_name[setObj["phaseId"]],
+                    "entrant_1_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant1Id"]],
+                    "entrant_2_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant2Id"]],
+                    "entrant_1_character_ids": setObj.get("entrant1CharacterIds", []),
+                    "entrant_2_character_ids": setObj.get("entrant2CharacterIds", []),
+                    "vod_url": setObj["vodUrl"]
+                })
+    return sets, name, date
 
-def process_event(startgg_url, playlist_urls):
-    print(f"Processing {startgg_url}")
+def get_sets_vod_urls(sets: list, tournament_name: str, tournament_date: str):
     data = []
-    slugs = get_slugs_from_url(startgg_url)
-    if not slugs:
-        print("Could not get slugs")
-        return []
-    tournament_slug, event_slug = slugs
-    client = startgg_gql.get_client()
-    tournament_name, timezone = startgg_gql.get_tournament_name_and_timezone(client, tournament_slug)
-    event_id = startgg_gql.get_event_id(client, event_slug)
-    set_ids = startgg_gql.get_event_set_ids(client, event_id)
-    while len(set_ids):
-        set_id = set_ids[-1]
-        print(f"Processing set {set_id}")
-        try:
-            set_data = startgg_gql.get_set_data(client, set_id)
-            vod_data = get_vod_data(set_data, tournament_name, timezone)
-            if not vod_data:
-                # Try to get video from playlist
-                url = find_matching_youtube_video(set_data, playlist_urls)
-                if url:
-                    set_data["vodUrl"] = url
-                    vod_data = get_vod_data(set_data, tournament_name, timezone)
-                    try:
-                        startgg_gql.set_vod(client, set_id, url)
-                    except Exception as e:
-                        print(f"Failed to assign video: {e}")
-            if vod_data:
-                vod_data["id"] = len(data)
+    for setObj in sets:
+        video_url = setObj["vod_url"]
+        if video_url is not None:
+            vod_data = get_vod_data(setObj, tournament_name, tournament_date, video_url)
+            if vod_data is not None:
                 data.append(vod_data)
-            set_ids.pop()
-        except TransportServerError as err:
-            if err.code == 429:
-                print("Too many requests; taking a nap")
-                print("(You shouldn't see this if you're limiting reqs properly)")
-                client = startgg_gql.get_client()
-                time.sleep(10)
-            else:
-                raise
     return data
 
-def process_urls(startgg_urls, playlist_urls, file):
-    if len(playlist_urls) == 0:
-        playlist_urls = [[None]] * len(startgg_urls)
-    elif len(startgg_urls) != len(startgg_urls):
-        print("Not enough playlist URLs!")
-        sys.exit(1)
+def get_matching_sets(video_title: str, sets: list):
+    video_title_safe = normalize(video_title)
+    exact_match_sets = []
+    only_tags_match_sets = []
+    for setObj in sets:
+        all_gamer_tags_found = all([
+            normalize(gamer_tag) in video_title_safe
+            for gamer_tag in setObj["entrant_1_gamer_tags"] + setObj["entrant_2_gamer_tags"]
+        ])
+        if all_gamer_tags_found:
+            full_round_text = cast(str, setObj["full_round_text"])
+            full_round_text_found = normalize(setObj["full_round_text"]) in video_title_safe
+            abbrev_round_text = "".join(re.findall('([A-Z]|[0-9])', full_round_text))
+            abbrev_round_text_found = normalize(abbrev_round_text) in video_title_safe
+            any_round_found = full_round_text_found or abbrev_round_text_found
+            phase_name_found = normalize(setObj["phase_name"]) in video_title_safe
+            if any_round_found and phase_name_found:
+                exact_match_sets.append(setObj)
+            else:
+                only_tags_match_sets.append(setObj)
+    return exact_match_sets, only_tags_match_sets
 
-    for i, playlist_url in enumerate(playlist_urls):
-        if not playlist_url:
-            playlist_urls[i] = []
-            continue
+def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, date: str):
+    data = []
+    set_video_urls: list[tuple[any, str]] = []
+    unmatched_videos: list[tuple[str, str]] = []
+
+    current_videos = videos
+    while len(current_videos) > 0:
+        next_videos: list[tuple[str, str]] = []
+        for video in current_videos:
+            video_title, video_url = video
+            exact_match_sets, only_tags_match_sets = get_matching_sets(video_title, sets)
+            if len(exact_match_sets) == 1:
+                set_video_urls.append((exact_match_sets[0], video_url))
+                vod_data = get_vod_data(exact_match_sets[0], name, date, video_url)
+                if vod_data is not None:
+                    data.append(vod_data)
+                sets.remove(exact_match_sets[0])
+                print(f"matched tags, round, and phase: {video_title}")
+            elif len(exact_match_sets) > 1:
+                next_videos.append(video)
+            elif len(only_tags_match_sets) == 1:
+                set_video_urls.append((only_tags_match_sets[0], video_url))
+                vod_data = get_vod_data(only_tags_match_sets[0], name, date, video_url)
+                if vod_data is not None:
+                    data.append(vod_data)
+                sets.remove(only_tags_match_sets[0])
+                print(f"matched tags: {video_title}")
+            elif len(only_tags_match_sets) > 1:
+                next_videos.append(video)
+            else:
+                unmatched_videos.append(video)
+        if len(current_videos) == len(next_videos):
+            print(f"videos with multiple matches: {pprint.pformat(next_videos)}")
+            break
+        current_videos = next_videos
+    if len(unmatched_videos) > 0:
+        print(f"unmatched videos: {pprint.pformat(unmatched_videos)}")
+    return set_video_urls, data
+
+def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool):
+    print(f"Setting VOD URLs for {slug}")
+    sets, name, date = get_tournament_sets_name_and_date(slug)
+    set_video_urls, data = match_videos_to_sets(videos, sets, name, date)
+
+    requests = []
+    for setObj, video_url in set_video_urls:
+        if get_youtube_id_from_url(setObj["vod_url"]) != get_youtube_id_from_url(video_url):
+            requests.append(startgg_gql.get_set_vod_request(setObj["id"], video_url))
+    original_requests_len = len(requests)
+    if dry_run:
+        print(f"{len(requests)} new VOD URLs matched but not set in {slug}")
+    else:
+        while len(requests) > 0:
+            # no rate handling because you'd need 40,000 VODs to exceed
+            startgg_gql.batch_set_vods(startgg_gql.get_client(api_key), requests[:500])
+            requests = requests[500:]
+        print(f"{original_requests_len} new VOD URLs set in {slug}")
+
+    existing_data = get_sets_vod_urls(sets, name, date)
+    print(f"{len(existing_data) + len(data) - original_requests_len} existing VOD URLs found in {slug}")
+    data.extend(existing_data)
+    return data
+
+def get_tournament_vod_urls(slug: str):
+    print(f"Getting VOD URLs from {slug}")
+    sets, name, date = get_tournament_sets_name_and_date(slug)
+    data = get_sets_vod_urls(sets, name, date)
+    print(f"{len(data)} VOD URLs found in {slug}")
+    return data
+
+def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bool):
+    videos: list[tuple[str, str]] = []
+    for playlist_url in playlist_urls:
+        print(f"Processing {playlist_url}")
         try:
             playlist = Playlist(playlist_url)
-            playlist_urls[i] = [(vid.title, vid.watch_url) for vid in playlist.videos]
+            playlist_videos = [(vid.title, vid.watch_url) for vid in playlist.videos]
+            videos.extend(playlist_videos)
+            print(f"{len(playlist_videos)} videos found in {playlist_url}")
         except Exception as e:
-            print(f"Failed to process playlist '{playlist_url}': {e}")
+            print(f"Failed to process playlist {playlist_url}: {e}")
             sys.exit(1)
 
     data = []
-    for startgg_url, playlist_url in zip(startgg_urls, playlist_urls):
-        data.extend(process_event(startgg_url, playlist_url))
-        if playlist_url:
-            print(f"Warning - videos left in playlist: {pprint.pformat(playlist_url)}")
+    if len(videos) == 0:
+        data.extend(get_tournament_vod_urls(slug))
+    else:
+        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run))
 
     json.dump(data, file, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("startgg_urls", nargs="+", type=str)
-    parser.add_argument("--playlist-urls", nargs="*", type=str, default=[[]])
+    parser.add_argument("slug", type=str)
+    parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
+    parser.add_argument("--api-key", type=str, default="")
+    parser.add_argument("--dry-run", type=bool, default=False)
     args = parser.parse_args()
 
-    process_urls(args.startgg_urls, args.playlist_urls, args.out)
+    process(args.slug, args.playlist_urls, args.out, args.api_key, args.dry_run)
