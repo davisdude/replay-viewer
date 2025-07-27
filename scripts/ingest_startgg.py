@@ -49,24 +49,24 @@ def get_youtube_id_from_url(url: str):
         return None
     return match.group("id")
 
-def get_vod_data(setObj, tournament_name: str, date: str, video_url: str):
-    if (len(setObj["entrant_1_gamer_tags"]) != 1 or len(setObj["entrant_2_gamer_tags"]) != 1):
+def get_vod_data(set_obj, tournament_name: str, date: str, video_url: str):
+    if (len(set_obj["entrant_1_gamer_tags"]) != 1 or len(set_obj["entrant_2_gamer_tags"]) != 1):
         return None
 
     youtube_id = get_youtube_id_from_url(video_url)
     entrant_1_characters: list[str] = []
-    for character_id in setObj["entrant_1_character_ids"]:
+    for character_id in set_obj["entrant_1_character_ids"]:
         entrant_1_characters.append(id_to_character[character_id])
     entrant_2_characters: list[str] = []
-    for character_id in setObj["entrant_2_character_ids"]:
+    for character_id in set_obj["entrant_2_character_ids"]:
         entrant_2_characters.append(id_to_character[character_id])
     return {
         "youtubeId": youtube_id,
         "date": date,
         "tournament": tournament_name,
-        "player1": setObj["entrant_1_gamer_tags"][0],
+        "player1": set_obj["entrant_1_gamer_tags"][0],
         "player1Characters": entrant_1_characters,
-        "player2": setObj["entrant_2_gamer_tags"][0],
+        "player2": set_obj["entrant_2_gamer_tags"][0],
         "player2Characters": entrant_2_characters,
         "tags": [],
     }
@@ -95,26 +95,26 @@ def get_tournament_sets_name_and_date(slug: str):
                 for participant in entrant["mutations"]["participants"].values()
             ] for entrant in group_response["entities"]["entrants"]
         }
-        for setObj in group_response["entities"]["sets"]:
-            if (setObj["entrant1Id"] is not None and setObj["entrant2Id"] is not None and setObj["unreachable"] != True):
+        for set_obj in group_response["entities"]["sets"]:
+            if (set_obj["entrant1Id"] is not None and set_obj["entrant2Id"] is not None and set_obj["unreachable"] != True):
                 sets.append({
-                    "id": setObj["id"],
-                    "full_round_text": setObj["fullRoundText"],
-                    "phase_name": phase_id_to_name[setObj["phaseId"]],
-                    "entrant_1_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant1Id"]],
-                    "entrant_2_gamer_tags": entrant_id_to_gamer_tags[setObj["entrant2Id"]],
-                    "entrant_1_character_ids": setObj.get("entrant1CharacterIds", []),
-                    "entrant_2_character_ids": setObj.get("entrant2CharacterIds", []),
-                    "vod_url": setObj["vodUrl"]
+                    "id": set_obj["id"],
+                    "full_round_text": set_obj["fullRoundText"],
+                    "phase_name": phase_id_to_name[set_obj["phaseId"]],
+                    "entrant_1_gamer_tags": entrant_id_to_gamer_tags[set_obj["entrant1Id"]],
+                    "entrant_2_gamer_tags": entrant_id_to_gamer_tags[set_obj["entrant2Id"]],
+                    "entrant_1_character_ids": set_obj.get("entrant1CharacterIds", []),
+                    "entrant_2_character_ids": set_obj.get("entrant2CharacterIds", []),
+                    "vod_url": set_obj["vodUrl"]
                 })
     return sets, name, date
 
 def get_sets_vod_urls(sets: list, tournament_name: str, tournament_date: str):
     data = []
-    for setObj in sets:
-        video_url = setObj["vod_url"]
+    for set_obj in sets:
+        video_url = set_obj["vod_url"]
         if video_url is not None:
-            vod_data = get_vod_data(setObj, tournament_name, tournament_date, video_url)
+            vod_data = get_vod_data(set_obj, tournament_name, tournament_date, video_url)
             if vod_data is not None:
                 data.append(vod_data)
     return data
@@ -123,22 +123,22 @@ def get_matching_sets(video_title: str, sets: list):
     video_title_safe = normalize(video_title)
     exact_match_sets = []
     only_tags_match_sets = []
-    for setObj in sets:
+    for set_obj in sets:
         all_gamer_tags_found = all([
             normalize(gamer_tag) in video_title_safe
-            for gamer_tag in setObj["entrant_1_gamer_tags"] + setObj["entrant_2_gamer_tags"]
+            for gamer_tag in set_obj["entrant_1_gamer_tags"] + set_obj["entrant_2_gamer_tags"]
         ])
         if all_gamer_tags_found:
-            full_round_text = cast(str, setObj["full_round_text"])
-            full_round_text_found = normalize(setObj["full_round_text"]) in video_title_safe
+            full_round_text = cast(str, set_obj["full_round_text"])
+            full_round_text_found = normalize(set_obj["full_round_text"]) in video_title_safe
             abbrev_round_text = "".join(re.findall('([A-Z]|[0-9])', full_round_text))
             abbrev_round_text_found = normalize(abbrev_round_text) in video_title_safe
             any_round_found = full_round_text_found or abbrev_round_text_found
-            phase_name_found = normalize(setObj["phase_name"]) in video_title_safe
+            phase_name_found = normalize(set_obj["phase_name"]) in video_title_safe
             if any_round_found and phase_name_found:
-                exact_match_sets.append(setObj)
+                exact_match_sets.append(set_obj)
             else:
-                only_tags_match_sets.append(setObj)
+                only_tags_match_sets.append(set_obj)
     return exact_match_sets, only_tags_match_sets
 
 def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, date: str):
@@ -186,9 +186,9 @@ def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: s
     set_video_urls, data = match_videos_to_sets(videos, sets, name, date)
 
     requests = []
-    for setObj, video_url in set_video_urls:
-        if (setObj["vod_url"] is None) or (get_youtube_id_from_url(setObj["vod_url"]) != get_youtube_id_from_url(video_url)):
-            requests.append(startgg_gql.get_set_vod_request(setObj["id"], video_url))
+    for set_obj, video_url in set_video_urls:
+        if (set_obj["vod_url"] is None) or (get_youtube_id_from_url(set_obj["vod_url"]) != get_youtube_id_from_url(video_url)):
+            requests.append(startgg_gql.get_set_vod_request(set_obj["id"], video_url))
     original_requests_len = len(requests)
     if dry_run:
         print(f"{len(requests)} new VOD URLs matched but not set in {slug}")
