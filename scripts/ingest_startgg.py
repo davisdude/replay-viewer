@@ -187,7 +187,7 @@ def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: s
 
     requests = []
     for setObj, video_url in set_video_urls:
-        if get_youtube_id_from_url(setObj["vod_url"]) != get_youtube_id_from_url(video_url):
+        if (setObj["vod_url"] is None) or (get_youtube_id_from_url(setObj["vod_url"]) != get_youtube_id_from_url(video_url)):
             requests.append(startgg_gql.get_set_vod_request(setObj["id"], video_url))
     original_requests_len = len(requests)
     if dry_run:
