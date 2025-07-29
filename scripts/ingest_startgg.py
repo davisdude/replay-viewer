@@ -209,7 +209,7 @@ def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: s
             requests.append(startgg_gql.get_set_vod_request(set_obj["id"], video_url))
     original_requests_len = len(requests)
     if dry_run:
-        print(f"{len(requests)} new VOD URLs matched but not set in {slug}")
+        print(f"dry run: {len(requests)} new VOD URLs matched but not set in {slug}")
     else:
         while len(requests) > 0:
             # no rate handling because you'd need 40,000 VODs to exceed
