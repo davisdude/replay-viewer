@@ -5,6 +5,7 @@ import pprint
 import re
 import requests
 import sys
+import unicodedata
 
 from pytubefix import Playlist
 from typing import cast
@@ -72,7 +73,23 @@ def get_vod_data(set_obj, tournament_name: str, date: str, video_url: str):
     }
 
 def normalize(string: str):
-    return re.sub(r'[^a-z0-9!#$%&\'+,;=@^`{}~]', '', string.lower())
+    # normalize to compatibility characters, decompose combining characters, unicode lowercase
+    normalized = unicodedata.normalize("NFKD", unicodedata.normalize("NFKD", string).casefold())
+
+    # remove combining characters like diacritics
+    normalized_non_combining_chars = []
+    for c in list(normalized):
+        if (unicodedata.combining(c) == 0):
+            normalized_non_combining_chars.append(c)
+
+    # remove chars that are illegal in filenames (mostly on windows)
+    sub1 = re.sub(r'[\<\>\:"\/\\|\?\*]', '', "".join(normalized_non_combining_chars))
+
+    # replace chars that YT replaces with space
+    sub2 = re.sub(r'[.\-_]', ' ', sub1)
+
+    # remove chars that YT removes
+    return re.sub(r'[\(\)\[\]]', '', sub2)
 
 def get_tournament_sets_name_and_date(slug: str):
     tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
@@ -86,7 +103,8 @@ def get_tournament_sets_name_and_date(slug: str):
     }
     sets = []
     for group in tournament_response["entities"]["groups"]:
-        group_response = requests.get(f"https://api.start.gg/phase_group/{group["id"]}?expand[]=sets&expand[]=entrants").json()
+        group_id = group["id"]
+        group_response = requests.get(f"https://api.start.gg/phase_group/{group_id}?expand[]=sets&expand[]=entrants").json()
         if "entrants" not in group_response["entities"]:
             continue
         entrant_id_to_gamer_tags = {
