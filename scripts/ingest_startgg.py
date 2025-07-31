@@ -8,6 +8,7 @@ import sys
 import unicodedata
 
 from pytubefix import Playlist
+from sanitize_filename import sanitize
 from typing import cast
 from zoneinfo import ZoneInfo
 
@@ -82,14 +83,14 @@ def normalize(string: str):
         if (unicodedata.combining(c) == 0):
             normalized_non_combining_chars.append(c)
 
-    # remove chars that are illegal in filenames (mostly on windows)
-    sub1 = re.sub(r'[\<\>\:"\/\\|\?\*]', '', "".join(normalized_non_combining_chars))
+    # sanitize for filename legality
+    sanitized = sanitize("".join(normalized_non_combining_chars))
 
     # replace chars that YT replaces with space
-    sub2 = re.sub(r'[.\-_]', ' ', sub1)
+    yt_space_replaced = re.sub(r'[.\-_]', ' ', sanitized)
 
     # remove chars that YT removes
-    return re.sub(r'[\(\)\[\]]', '', sub2)
+    return re.sub(r'[\(\)\[\]]', '', yt_space_replaced)
 
 def get_tournament_sets_name_and_date(slug: str):
     tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
