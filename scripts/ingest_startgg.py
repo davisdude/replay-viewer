@@ -106,7 +106,9 @@ def get_tournament_sets_name_and_date(slug: str):
     for group in tournament_response["entities"]["groups"]:
         group_id = group["id"]
         group_response = requests.get(f"https://api.start.gg/phase_group/{group_id}?expand[]=sets&expand[]=entrants").json()
-        if "entrants" not in group_response["entities"]:
+        if "sets" not in group_response["entities"] or len(group_response["entities"]["sets"]) == 0:
+            continue
+        if "entrants" not in group_response["entities"] or len(group_response["entities"]["entrants"]) == 0:
             continue
         entrant_id_to_gamer_tags = {
             entrant["id"]: [
