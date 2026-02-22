@@ -17,7 +17,7 @@ mutation ($setId: ID!, $vodUrl: String) {
 
 def get_set_vod_request(set_id: str, video_url: str):
     params = {"setId": set_id, "vodUrl": video_url}
-    return GraphQLRequest(document=SET_VOD_MUTATION, variable_values=params)
+    return GraphQLRequest(request=SET_VOD_MUTATION, variable_values=params)
 
 def batch_set_vods(client: Client, requests: list[GraphQLRequest]):
     client.execute_batch(requests)
