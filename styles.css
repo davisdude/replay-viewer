@@ -30,9 +30,13 @@ body {
     box-sizing: border-box;
 }
 
-h1 {
+h1, footer {
     text-align: center;
     color: var(--text-primary);
+}
+
+a {
+    color: var(--text-secondary);
 }
 
 /* Main container */
