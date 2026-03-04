@@ -92,8 +92,11 @@ def normalize(string: str):
     # remove chars that YT removes
     return re.sub(r'[\(\)\[\]]', '', yt_space_replaced)
 
-def get_tournament_sets_name_and_date(slug: str):
+def get_tournament_sets_name_and_date(slug: str, event_ids: list[int]):
     tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
+    if not tournament_response.get("success", True):
+        print(f"Invalid request! Got message '{tournament_response['message']}'")
+        return [], "", ""
     name = tournament_response["entities"]["tournament"]["name"]
     time = tournament_response["entities"]["tournament"]["startAt"]
     timezone = tournament_response["entities"]["tournament"]["timezone"]
@@ -104,11 +107,12 @@ def get_tournament_sets_name_and_date(slug: str):
     }
     sets = []
     for group in tournament_response["entities"]["groups"]:
-        group_id = group["id"]
-        group_response = requests.get(f"https://api.start.gg/phase_group/{group_id}?expand[]=sets&expand[]=entrants").json()
-        if "sets" not in group_response["entities"] or len(group_response["entities"]["sets"]) == 0:
+        if event_ids and group["id"] not in event_ids:
             continue
-        if "entrants" not in group_response["entities"] or len(group_response["entities"]["entrants"]) == 0:
+        group_response = requests.get(f"https://api.start.gg/phase_group/{group["id"]}?expand[]=sets&expand[]=entrants").json()
+        if "sets" not in group_response["entities"]:
+            continue
+        if "entrants" not in group_response["entities"]:
             continue
         entrant_id_to_gamer_tags = {
             entrant["id"]: [
@@ -201,9 +205,9 @@ def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, d
         print(f"unmatched videos: {pprint.pformat(unmatched_videos)}")
     return set_video_urls, data
 
-def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool):
+def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool, event_ids: list[int]):
     print(f"Setting VOD URLs for {slug}")
-    sets, name, date = get_tournament_sets_name_and_date(slug)
+    sets, name, date = get_tournament_sets_name_and_date(slug, event_ids)
     set_video_urls, data = match_videos_to_sets(videos, sets, name, date)
 
     requests = []
@@ -232,7 +236,7 @@ def get_tournament_vod_urls(slug: str):
     print(f"{len(data)} VOD URLs found in {slug}")
     return data
 
-def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bool):
+def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bool, event_ids: list[int]):
     videos: list[tuple[str, str]] = []
     for playlist_url in playlist_urls:
         print(f"Processing {playlist_url}")
@@ -249,7 +253,7 @@ def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bo
     if len(videos) == 0:
         data.extend(get_tournament_vod_urls(slug))
     else:
-        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run))
+        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run, event_ids))
 
     json.dump(data, file, indent=2)
 
@@ -259,7 +263,8 @@ if __name__ == "__main__":
     parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
     parser.add_argument("--api-key", type=str, default="")
-    parser.add_argument("--dry-run", type=bool, default=False)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--event-ids", nargs="*", type=int, default=[])
     args = parser.parse_args()
 
-    process(args.slug, args.playlist_urls, args.out, args.api_key, args.dry_run)
+    process(args.slug, args.playlist_urls, args.out, args.api_key, args.dry_run, args.event_ids)
