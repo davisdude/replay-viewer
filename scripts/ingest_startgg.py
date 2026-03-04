@@ -238,7 +238,7 @@ if __name__ == "__main__":
     parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
     parser.add_argument("--api-key", type=str, default="")
-    parser.add_argument("--dry-run", type=bool, default=False)
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     process(args.slug, args.playlist_urls, args.out, args.api_key, args.dry_run)
