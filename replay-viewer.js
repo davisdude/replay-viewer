@@ -303,8 +303,16 @@ function getPlayerMatch(replay, playerTag, character, skip) {
     const player1TagMatch = playerTag ? (replay.player1 == playerTag) : true;
     const player2TagMatch = playerTag ? (replay.player2 == playerTag) : true;
 
-    const player1CharMatch = replay.player1Characters.includes(character);
-    const player2CharMatch = replay.player2Characters.includes(character);
+    var player1CharMatch = true;
+    var player2CharMatch = true;
+    if (character) {
+        if (replay.player1Characters) {
+            player1CharMatch = replay.player1Characters.includes(character);
+        }
+        if (replay.player2Characters) {
+            player2CharMatch = replay.player2Characters.includes(character);
+        }
+    }
 
     if (player1TagMatch && player1CharMatch && !skip.includes(1)) return [true, 1];
     if (player2TagMatch && player2CharMatch && !skip.includes(2)) return [true, 2];
@@ -318,11 +326,6 @@ function performSearch() {
     const player2TagTerm = player2TagSelect.value;
     const player1Character = player1CharacterSelect.value;
     const player2Character = player2CharacterSelect.value;
-
-    if (!searchTerm && !player1TagTerm && !player2TagTerm && !player1Character && !player2Characters) {
-        displayReplays(replayData);
-        return;
-    }
 
     loadingMessage.style.display = 'block';
 
