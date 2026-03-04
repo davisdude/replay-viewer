@@ -4,14 +4,15 @@ import json
 def merge_json(parent_data, child_data):
     ids = [vod["id"] for vod in parent_data]
     max_id = max(ids)
-    parent_data = {vod["youtubeId"]: vod for vod in parent_data}
+    parent_data = {(vod["youtubeId"], vod.get("timestamp")): vod for vod in parent_data}
     for child_vod in child_data:
         yt_id = child_vod["youtubeId"]
-        if yt_id not in parent_data:
+        ts = child_vod.get("timestamp")
+        if (yt_id, ts) not in parent_data:
             print(f"Found a new video: {yt_id}")
-            parent_data[yt_id] = {"id": max_id}
             max_id += 1
-        parent_vod = parent_data[yt_id]
+            parent_data[(yt_id, ts)] = {"id": max_id}
+        parent_vod = parent_data[(yt_id, ts)]
         # TODO: This doesn't properly account for tag differences (non-swaps)
         ##manual_items = ["player1", "player2"]
         ## Swaps players/characters to match start.gg data

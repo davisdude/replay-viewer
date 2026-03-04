@@ -120,7 +120,7 @@ def get_tournament_sets_name_and_date(slug: str, event_ids: list[int]):
                 for participant in entrant["mutations"]["participants"].values()
             ] for entrant in group_response["entities"]["entrants"]
         }
-        for set_obj in group_response["entities"]["sets"]:
+        for set_obj in group_response["entities"].get("sets", []):
             if (set_obj["entrant1Id"] is not None and set_obj["entrant2Id"] is not None and set_obj["unreachable"] != True):
                 sets.append({
                     "id": set_obj["id"],
