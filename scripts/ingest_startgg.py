@@ -76,6 +76,9 @@ def normalize(string: str):
 
 def get_tournament_sets_name_and_date(slug: str):
     tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
+    if not tournament_response.get("success", True):
+        print(f"Invalid request! Got message '{tournament_response['message']}'")
+        return [], "", ""
     name = tournament_response["entities"]["tournament"]["name"]
     time = tournament_response["entities"]["tournament"]["startAt"]
     timezone = tournament_response["entities"]["tournament"]["timezone"]
