@@ -5,8 +5,10 @@ import pprint
 import re
 import requests
 import sys
+import unicodedata
 
 from pytubefix import Playlist
+from sanitize_filename import sanitize
 from typing import cast
 from zoneinfo import ZoneInfo
 
@@ -72,7 +74,23 @@ def get_vod_data(set_obj, tournament_name: str, date: str, video_url: str):
     }
 
 def normalize(string: str):
-    return re.sub(r'[^a-z0-9!#$%&\'+,;=@^`{}~]', '', string.lower())
+    # normalize to compatibility characters, decompose combining characters, unicode lowercase
+    normalized = unicodedata.normalize("NFKD", unicodedata.normalize("NFKD", string).casefold())
+
+    # remove combining characters like diacritics
+    normalized_non_combining_chars = []
+    for c in list(normalized):
+        if (unicodedata.combining(c) == 0):
+            normalized_non_combining_chars.append(c)
+
+    # sanitize for filename legality
+    sanitized = sanitize("".join(normalized_non_combining_chars))
+
+    # replace chars that YT replaces with space
+    yt_space_replaced = re.sub(r'[.\-_]', ' ', sanitized)
+
+    # remove chars that YT removes
+    return re.sub(r'[\(\)\[\]]', '', yt_space_replaced)
 
 def get_tournament_sets_name_and_date(slug: str, event_ids: list[int]):
     tournament_response = requests.get(f"https://api.start.gg/tournament/{slug}?expand[]=groups&expand[]=phase").json()
@@ -92,6 +110,8 @@ def get_tournament_sets_name_and_date(slug: str, event_ids: list[int]):
         if event_ids and group["id"] not in event_ids:
             continue
         group_response = requests.get(f"https://api.start.gg/phase_group/{group["id"]}?expand[]=sets&expand[]=entrants").json()
+        if "sets" not in group_response["entities"]:
+            continue
         if "entrants" not in group_response["entities"]:
             continue
         entrant_id_to_gamer_tags = {
@@ -196,7 +216,7 @@ def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: s
             requests.append(startgg_gql.get_set_vod_request(set_obj["id"], video_url))
     original_requests_len = len(requests)
     if dry_run:
-        print(f"{len(requests)} new VOD URLs matched but not set in {slug}")
+        print(f"dry run: {len(requests)} new VOD URLs matched but not set in {slug}")
     else:
         while len(requests) > 0:
             # no rate handling because you'd need 40,000 VODs to exceed
