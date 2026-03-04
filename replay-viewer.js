@@ -296,6 +296,13 @@ function getSearchableMatch(replay, searchTerm) {
     });
 }
 
+function getTournamentMatch(replay, tournament) {
+    if (!tournament) return true;
+    const tournamentMatch = replay.tournament == tournament;
+    const tournamentShortMatch = replay.tournamentShort == tournament;
+    return tournamentMatch || tournamentShortMatch;
+}
+
 function getPlayerMatch(replay, playerTag, character, skip) {
     if (!playerTag && !character) return [true, 0];
     if (!replay.player1 || !replay.player2) return [false, 0];
@@ -322,6 +329,7 @@ function getPlayerMatch(replay, playerTag, character, skip) {
 // Search functionality
 function performSearch() {
     const searchTerm = searchInput.value.trim();
+    const tournamentTerm = tournamentSelect.value;
     const player1TagTerm = player1TagSelect.value;
     const player2TagTerm = player2TagSelect.value;
     const player1Character = player1CharacterSelect.value;
@@ -334,13 +342,14 @@ function performSearch() {
 
         const filtered = replayData.filter(replay => {
             const searchMatch = getSearchableMatch(replay, searchTerm);
+            const tournamentMatch = getTournamentMatch(replay, tournamentTerm);
             const [player1Match, player1MatchedPlayer] = getPlayerMatch(
                 replay, player1TagTerm, player1Character, []
             );
             const [player2Match, player2MatchedPlayer] = getPlayerMatch(
                 replay, player2TagTerm, player2Character, [player1MatchedPlayer]
             );
-            return searchMatch && player1Match && player2Match;
+            return searchMatch && tournamentMatch && player1Match && player2Match;
         });
 
         displayReplays(filtered);
