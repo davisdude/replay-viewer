@@ -316,8 +316,15 @@ function getPlayerMatch(replay, playerTag, character, skip) {
         if (replay.player1Characters) {
             player1CharMatch = replay.player1Characters.includes(character);
         }
+        else
+        {
+            player1CharMatch = false;
+        }
         if (replay.player2Characters) {
             player2CharMatch = replay.player2Characters.includes(character);
+        }
+        {
+            player2CharMatch = false;
         }
     }
 
