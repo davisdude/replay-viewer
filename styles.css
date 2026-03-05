@@ -30,13 +30,19 @@ body {
     box-sizing: border-box;
 }
 
-h1, h2, footer {
+h1, h2, footer, details {
     text-align: center;
     color: var(--text-primary);
 }
 
 a {
     color: var(--text-secondary);
+}
+
+.title {
+    text-align: center;
+    color: var(--text-primary);
+    font-size: 2em;
 }
 
 /* Main container */
@@ -258,6 +264,7 @@ a {
     align-items: center;
     gap: var(--spacing-sm);
     flex-wrap: wrap;
+    padding: var(--spacing-md);
 }
 
 #paginationBottom {
