@@ -88,10 +88,12 @@ async function loadData() {
 
 // Setup event listeners
 function setupEventListeners() {
-    searchButton.addEventListener('click', performSearch);
+    searchButton1.addEventListener('click', performSearch);
+    searchButton2.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') performSearch();
     });
+    resetButton.addEventListener('click', performReset);
 }
 
 function createReplayItem(replay) {
@@ -363,6 +365,16 @@ function performSearch() {
     }, 200);
 }
 
+function performReset() {
+    searchInput.value = "";
+    tournamentSelect.value = "";
+    player1TagSelect.value = "";
+    player2TagSelect.value = "";
+    player1CharacterSelect.value = "";
+    player2CharacterSelect.value = "";
+    performSearch();
+}
+
 // Get player aliases
 function getPlayerAliases(searchTerm) {
     const normalized = searchTerm.toLowerCase().trim();
@@ -426,7 +438,9 @@ let currentSearchResults = [];
 
 // DOM elements
 const searchInput = document.getElementById('replaySearch');
-const searchButton = document.getElementById('searchButton');
+const searchButton1 = document.getElementById('searchButton1');
+const searchButton2 = document.getElementById('searchButton2');
+const resetButton = document.getElementById('resetButton');
 const tournamentSelect = document.getElementById('tournament');
 const player1TagSelect = document.getElementById('player1Tag');
 const player2TagSelect = document.getElementById('player2Tag');
