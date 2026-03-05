@@ -325,6 +325,7 @@ function getPlayerMatch(replay, playerTag, character, skip) {
         if (replay.player2Characters) {
             player2CharMatch = replay.player2Characters.includes(character);
         }
+        else
         {
             player2CharMatch = false;
         }
