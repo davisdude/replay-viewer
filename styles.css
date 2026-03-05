@@ -118,18 +118,16 @@ a {
     display: flex;
     flex-wrap: wrap;
     flex-direction: column;
-    flex-grow: 3;
+    flex: 3 3 30em;
     min-width: 15em;
     padding: var(--spacing-sm);
 }
 
 .advanced-search-subcomponent label {
-    flex-grow: 0;
     color: var(--text-primary);
 }
 
 .advanced-search-subcomponent select {
-    flex-grow: 2;
     background: var(--surface-color);
     color: var(--text-primary);
     padding: var(--spacing-md);
