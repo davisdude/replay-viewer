@@ -7,7 +7,7 @@ import requests
 import sys
 import unicodedata
 
-from pytubefix import Playlist
+from pytubefix import Playlist, YouTube
 from sanitize_filename import sanitize
 from typing import cast
 from zoneinfo import ZoneInfo
@@ -166,7 +166,7 @@ def get_matching_sets(video_title: str, sets: list):
                 only_tags_match_sets.append(set_obj)
     return exact_match_sets, only_tags_match_sets
 
-def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, date: str):
+def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, date: str, suffix: str):
     data = []
     set_video_urls: list[tuple[any, str]] = []
     unmatched_videos: list[tuple[str, str]] = []
@@ -176,7 +176,8 @@ def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, d
         next_videos: list[tuple[str, str]] = []
         for video in current_videos:
             video_title, video_url = video
-            exact_match_sets, only_tags_match_sets = get_matching_sets(video_title, sets)
+            new_title = video_title.replace(suffix, "", 1)
+            exact_match_sets, only_tags_match_sets = get_matching_sets(new_title, sets)
             if len(exact_match_sets) == 1:
                 set_video_urls.append((exact_match_sets[0], video_url))
                 vod_data = get_vod_data(exact_match_sets[0], name, date, video_url)
@@ -205,10 +206,10 @@ def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, d
         print(f"unmatched videos: {pprint.pformat(unmatched_videos)}")
     return set_video_urls, data
 
-def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool, event_ids: list[int]):
+def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool, event_ids: list[int], suffix: str):
     print(f"Setting VOD URLs for {slug}")
     sets, name, date = get_tournament_sets_name_and_date(slug, event_ids)
-    set_video_urls, data = match_videos_to_sets(videos, sets, name, date)
+    set_video_urls, data = match_videos_to_sets(videos, sets, name, date, suffix)
 
     requests = []
     for set_obj, video_url in set_video_urls:
@@ -236,7 +237,7 @@ def get_tournament_vod_urls(slug: str):
     print(f"{len(data)} VOD URLs found in {slug}")
     return data
 
-def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bool, event_ids: list[int]):
+def process(slug: str, playlist_urls: list[str], video_urls: list[str], file, api_key: str, dry_run: bool, event_ids: list[int], suffix: str):
     videos: list[tuple[str, str]] = []
     for playlist_url in playlist_urls:
         print(f"Processing {playlist_url}")
@@ -249,11 +250,19 @@ def process(slug: str, playlist_urls: list[str], file, api_key: str, dry_run: bo
             print(f"Failed to process playlist {playlist_url}: {e}")
             sys.exit(1)
 
+    for video_url in video_urls:
+        try:
+            video = YouTube(video_url)
+            videos.append((video.title, video.watch_url))
+        except Exception as e:
+            print(f"Failed to process video {video_url}: {e}")
+            sys.exit(1)
+
     data = []
     if len(videos) == 0:
         data.extend(get_tournament_vod_urls(slug))
     else:
-        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run, event_ids))
+        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run, event_ids, suffix))
 
     json.dump(data, file, indent=2)
 
@@ -261,10 +270,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("slug", type=str)
     parser.add_argument("--playlist-urls", nargs="*", type=str, default=[])
+    parser.add_argument("--video-urls", nargs="*", type=str, default=[])
     parser.add_argument("--out", type=argparse.FileType("w"), default="out.json")
     parser.add_argument("--api-key", type=str, default="")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--event-ids", nargs="*", type=int, default=[])
+    parser.add_argument("--suffix", type=str, default="")
     args = parser.parse_args()
 
-    process(args.slug, args.playlist_urls, args.out, args.api_key, args.dry_run, args.event_ids)
+    process(args.slug, args.playlist_urls, args.video_urls, args.out, args.api_key, args.dry_run, args.event_ids, args.suffix)
