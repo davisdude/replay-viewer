@@ -166,7 +166,12 @@ def get_matching_sets(video_title: str, sets: list):
                 only_tags_match_sets.append(set_obj)
     return exact_match_sets, only_tags_match_sets
 
-def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, date: str, suffix: str):
+def match_videos_to_sets(videos: list[tuple[str, str]],
+                         sets: list,
+                         name: str,
+                         date: str,
+                         suffix: str,
+                         interactive: bool):
     data = []
     set_video_urls: list[tuple[any, str]] = []
     unmatched_videos: list[tuple[str, str]] = []
@@ -174,6 +179,7 @@ def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, d
     current_videos = videos
     while len(current_videos) > 0:
         next_videos: list[tuple[str, str]] = []
+        set_matches: list[set_obj] = []
         for video in current_videos:
             video_title, video_url = video
             new_title = video_title.replace(suffix, "", 1)
@@ -187,6 +193,7 @@ def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, d
                 print(f"matched tags, round, and phase: {video_title}")
             elif len(exact_match_sets) > 1:
                 next_videos.append(video)
+                set_matches.append(exact_match_sets)
             elif len(only_tags_match_sets) == 1:
                 set_video_urls.append((only_tags_match_sets[0], video_url))
                 vod_data = get_vod_data(only_tags_match_sets[0], name, date, video_url)
@@ -196,20 +203,54 @@ def match_videos_to_sets(videos: list[tuple[str, str]], sets: list, name: str, d
                 print(f"matched tags: {video_title}")
             elif len(only_tags_match_sets) > 1:
                 next_videos.append(video)
+                set_matches.append(only_tags_match_sets)
             else:
                 unmatched_videos.append(video)
         if len(current_videos) == len(next_videos):
-            print(f"videos with multiple matches: {pprint.pformat(next_videos)}")
-            break
+            if not interactive:
+                print(f"videos with multiple matches: {pprint.pformat(next_videos)}")
+                break
+            else:
+                for next_video, subset_matches in zip(next_videos, set_matches):
+                    print(f"{next_video = }")
+                    for i, set_match in enumerate(subset_matches, start=1):
+                        p1_tags = ("/").join(set_match["entrant_1_gamer_tags"])
+                        p2_tags = ("/").join(set_match["entrant_2_gamer_tags"])
+                        round_text = set_match["full_round_text"]
+                        print(f"{i}) {p1_tags} vs {p2_tags} ({round_text})")
+                    while True:
+                        try:
+                            choice = input()
+                            choice_int = int(choice) - 1
+                            if choice_int > len(subset_matches):
+                                print("Outside range")
+                                continue
+                            set_obj = subset_matches[choice_int]
+                            video_url = next_video[1]
+                            set_video_urls.append((set_obj, video_url))
+                            vod_data = get_vod_data(set_obj, name, date, video_url)
+                            if vod_data is not None:
+                                data.append(vod_data)
+                            sets.remove(set_obj)
+                            break
+                        except ValueError:
+                            print(f"Invalid choice '{choice}'")
+                break
         current_videos = next_videos
     if len(unmatched_videos) > 0:
         print(f"unmatched videos: {pprint.pformat(unmatched_videos)}")
     return set_video_urls, data
 
-def set_tournament_vod_urls(slug: str, videos: list[tuple[str, str]], api_key: str, dry_run: bool, event_ids: list[int], suffix: str):
+def set_tournament_vod_urls(slug: str,
+                            videos: list[tuple[str, str]],
+                            api_key: str,
+                            dry_run: bool,
+                            event_ids: list[int],
+                            suffix: str,
+                            interactive: bool):
     print(f"Setting VOD URLs for {slug}")
     sets, name, date = get_tournament_sets_name_and_date(slug, event_ids)
-    set_video_urls, data = match_videos_to_sets(videos, sets, name, date, suffix)
+    set_video_urls, data = match_videos_to_sets(videos, sets, name, date, suffix, interactive)
 
     requests = []
     for set_obj, video_url in set_video_urls:
@@ -237,7 +278,15 @@ def get_tournament_vod_urls(slug: str):
     print(f"{len(data)} VOD URLs found in {slug}")
     return data
 
-def process(slug: str, playlist_urls: list[str], video_urls: list[str], file, api_key: str, dry_run: bool, event_ids: list[int], suffix: str):
+def process(slug: str,
+            playlist_urls: list[str],
+            video_urls: list[str],
+            out,
+            api_key: str,
+            dry_run: bool,
+            event_ids: list[int],
+            suffix: str,
+            interactive: bool):
     videos: list[tuple[str, str]] = []
     for playlist_url in playlist_urls:
         print(f"Processing {playlist_url}")
@@ -262,9 +311,15 @@ def process(slug: str, playlist_urls: list[str], video_urls: list[str], file, ap
     if len(videos) == 0:
         data.extend(get_tournament_vod_urls(slug))
     else:
-        data.extend(set_tournament_vod_urls(slug, videos, api_key, dry_run, event_ids, suffix))
+        data.extend(set_tournament_vod_urls(slug,
+                                            videos,
+                                            api_key,
+                                            dry_run,
+                                            event_ids,
+                                            suffix,
+                                            interactive))
 
-    json.dump(data, file, indent=2)
+    json.dump(data, out, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -276,6 +331,7 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--event-ids", nargs="*", type=int, default=[])
     parser.add_argument("--suffix", type=str, default="")
+    parser.add_argument("--interactive", action="store_true")
     args = parser.parse_args()
 
-    process(args.slug, args.playlist_urls, args.video_urls, args.out, args.api_key, args.dry_run, args.event_ids, args.suffix)
+    process(**vars(args))
