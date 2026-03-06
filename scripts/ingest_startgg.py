@@ -271,9 +271,9 @@ def set_tournament_vod_urls(slug: str,
     data.extend(existing_data)
     return data
 
-def get_tournament_vod_urls(slug: str):
+def get_tournament_vod_urls(slug: str, event_ids: list[int]):
     print(f"Getting VOD URLs from {slug}")
-    sets, name, date = get_tournament_sets_name_and_date(slug)
+    sets, name, date = get_tournament_sets_name_and_date(slug, event_ids)
     data = get_sets_vod_urls(sets, name, date)
     print(f"{len(data)} VOD URLs found in {slug}")
     return data
@@ -309,7 +309,7 @@ def process(slug: str,
 
     data = []
     if len(videos) == 0:
-        data.extend(get_tournament_vod_urls(slug))
+        data.extend(get_tournament_vod_urls(slug, event_ids))
     else:
         data.extend(set_tournament_vod_urls(slug,
                                             videos,
