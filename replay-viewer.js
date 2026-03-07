@@ -1,8 +1,31 @@
+function processUrl() {
+    var entries = Object.fromEntries(new URLSearchParams(window.location.search));
+    processState(entries);
+}
+
+function processState(state) {
+    if (state === null) {
+        for (const value of Object.values(searchParams)) {
+            value.value = "";
+        }
+        return;
+    }
+    for (const [key, value] of Object.entries(state)) {
+        if (Object.hasOwn(searchParams, key)) {
+            searchParams[key].value = value;
+        }
+        else {
+            console.log("Unknown search param '" + key + "'");
+        }
+    }
+}
+
 // Initialize
 async function init() {
     await loadData();
     setupEventListeners();
-    displayReplays(replayData);
+    processUrl();
+    performSearch(false);
 }
 
 // Load replay data and aliases
@@ -88,10 +111,10 @@ async function loadData() {
 
 // Setup event listeners
 function setupEventListeners() {
-    searchButton1.addEventListener('click', performSearch);
-    searchButton2.addEventListener('click', performSearch);
+    searchButton1.addEventListener('click', () => performSearch(true));
+    searchButton2.addEventListener('click', () => performSearch(true));
     searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') performSearch();
+        if (e.key === 'Enter') performSearch(true);
     });
     resetButton.addEventListener('click', performReset);
 }
@@ -337,7 +360,7 @@ function getPlayerMatch(replay, playerTag, character, skip) {
 }
 
 // Search functionality
-function performSearch() {
+function performSearch(updateUrl) {
     const searchTerm = searchInput.value.trim();
     const tournamentTerm = tournamentSelect.value;
     const player1TagTerm = player1TagSelect.value;
@@ -364,6 +387,22 @@ function performSearch() {
 
         displayReplays(filtered);
     }, 200);
+
+    if (updateUrl) {
+        const url = new URL(window.location);
+        url.search = "";
+        if (searchTerm) url.searchParams.set("search", searchTerm);
+        if (tournamentTerm) url.searchParams.set("tournament", tournamentTerm);
+        if (player1TagTerm) url.searchParams.set("p1tag", player1TagTerm);
+        if (player2TagTerm) url.searchParams.set("p2tag", player2TagTerm);
+        if (player1Character) url.searchParams.set("p1char", player1Character);
+        if (player2Character) url.searchParams.set("p2char", player2Character);
+        const state = {}
+        for (const [key, value] of Object.entries(searchParams)) {
+            state[key] = value.value
+        }
+        history.pushState(state, "", url);
+    }
 }
 
 function performReset() {
@@ -373,7 +412,7 @@ function performReset() {
     player2TagSelect.value = "";
     player1CharacterSelect.value = "";
     player2CharacterSelect.value = "";
-    performSearch();
+    performSearch(true);
 }
 
 // Get player aliases
@@ -453,5 +492,22 @@ const paginationBottomContainer = document.getElementById('paginationBottom');
 const loadingMessage = resultsContainer.querySelector('.loading-message');
 const noResultsMessage = resultsContainer.querySelector('.no-results-message');
 
+const searchParams = {
+    search: searchInput,
+    tournament: tournamentSelect,
+    p1tag: player1TagSelect,
+    p2tag: player2TagSelect,
+    p1char: player1CharacterSelect,
+    p2char: player2CharacterSelect,
+};
+
 // Start the app
 document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('popstate', (event) => {
+    processState(event.state);
+    performSearch(false);
+});
+window.addEventListener('pushstate', (event) => {
+    processState(event.state);
+    performSearch(false);
+});
