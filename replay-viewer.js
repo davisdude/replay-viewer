@@ -32,6 +32,32 @@ async function init() {
     updatePagination(paginationContainer);
 }
 
+function alphabetize(a, b) {
+    return a.toLowerCase().localeCompare(b.toLowerCase());
+}
+
+function addPlayerTags(selector, playerTags) {
+    sortedTags = Object.keys(playerTags).sort(alphabetize);
+    for (const tag of sortedTags) {
+        const aliases = playerTags[tag];
+        if (aliases.length == 1) {
+            const option = document.createElement("option");
+            option.innerHTML = tag;
+            selector.appendChild(option);
+        }
+        else {
+            const optionGroup = document.createElement("optgroup");
+            optionGroup.setAttribute("label", tag);
+            for (const alias of aliases) {
+                const option = document.createElement("option")
+                option.innerHTML = alias;
+                optionGroup.appendChild(option);
+            }
+            selector.appendChild(optionGroup);
+        }
+    }
+}
+
 // Load replay data and aliases
 async function loadData() {
     try {
@@ -78,30 +104,30 @@ async function loadData() {
         });
 
         // Get unique player tags
-        playerTagsSet = new Set([]);
+        playerTagsSet = new Set();
         replayData.forEach(replay => {
             playerTagsSet.add(replay.player1);
             playerTagsSet.add(replay.player2);
         });
-        playerTags = Array.from(playerTagsSet).sort((a, b) => {
-            return a.toLowerCase().localeCompare(b.toLowerCase());
-        });
+
+        // Groups aliases by tag
+        playerTags = {};
+        for (const tag of playerTagsSet) {
+            const [mainTag, aliases] = getPlayerAliases(tag);
+            playerTags[mainTag] = aliases.sort(alphabetize);
+        }
 
         // Update player select
-        playerTags.forEach(tag => {
-            for (const selecter of [player1TagSelect, player2TagSelect]) {
-                const option = document.createElement("option");
-                option.innerHTML = tag;
-                selecter.appendChild(option);
-            }
-        });
+        for (const selector of [player1TagSelect, player2TagSelect]) {
+            addPlayerTags(selector, playerTags);
+        }
 
         // Update character select
         for (const character of Object.keys(characterIcons)) {
-            for (const selecter of [player1CharacterSelect, player2CharacterSelect]) {
+            for (const selector of [player1CharacterSelect, player2CharacterSelect]) {
                 const option = document.createElement("option");
                 option.innerHTML = character;
-                selecter.appendChild(option);
+                selector.appendChild(option);
             }
         };
     } catch (error) {
@@ -440,19 +466,13 @@ function performReset() {
 // Get player aliases
 function getPlayerAliases(searchTerm) {
     const normalized = searchTerm.toLowerCase().trim();
-
-    if (playerAliases[normalized]) {
-        return playerAliases[normalized];
-    }
-
     for (const [mainPlayer, aliases] of Object.entries(playerAliases)) {
         const normalizedAliases = aliases.map(alias => alias.toLowerCase().trim());
         if (normalizedAliases.includes(normalized)) {
-            return aliases;
+            return [mainPlayer, aliases];
         }
     }
-
-    return [];
+    return [searchTerm, [searchTerm]];
 }
 
 const characterIcons = {
