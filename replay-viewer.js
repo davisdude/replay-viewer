@@ -230,8 +230,7 @@ function displayReplays(list, page = 1) {
         });
     }
 
-    updatePagination(paginationTopContainer);
-    updatePagination(paginationBottomContainer);
+    updatePagination(paginationContainer);
 }
 
 
@@ -487,8 +486,7 @@ const player2TagSelect = document.getElementById('player2Tag');
 const player1CharacterSelect = document.getElementById('player1Character');
 const player2CharacterSelect = document.getElementById('player2Character');
 const resultsContainer = document.getElementById('replaysResults');
-const paginationTopContainer = document.getElementById('paginationTop');
-const paginationBottomContainer = document.getElementById('paginationBottom');
+const paginationContainer = document.getElementById('pagination');
 const loadingMessage = resultsContainer.querySelector('.loading-message');
 const noResultsMessage = resultsContainer.querySelector('.no-results-message');
 

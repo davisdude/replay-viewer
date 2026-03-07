@@ -148,6 +148,7 @@ a {
 
 /* Results section */
 .replay-results {
+    margin-top: var(--spacing-xl);
     margin-bottom: var(--spacing-xl);
 }
 
@@ -265,15 +266,6 @@ a {
     align-items: center;
     gap: var(--spacing-sm);
     flex-wrap: wrap;
-    padding: var(--spacing-md);
-}
-
-#paginationBottom {
-    margin-top: var(--spacing-xl);
-}
-
-#paginationTop {
-    margin-bottom: var(--spacing-xl);
 }
 
 .replay-pagination button {
