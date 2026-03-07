@@ -5,19 +5,22 @@ function processUrl() {
 
 function processState(state) {
     if (state === null) {
-        for (const value of Object.values(searchParams)) {
-            value.value = "";
-        }
-        return;
-    }
-    for (const [key, value] of Object.entries(state)) {
-        if (Object.hasOwn(searchParams, key)) {
-            searchParams[key].value = value;
-        }
-        else {
-            console.log("Unknown search param '" + key + "'");
+        for (const value of Object.values(urlParams)) {
+            if (Object.hasOwn(value, "value")) value.value = "";
         }
     }
+    else {
+        for (const [key, value] of Object.entries(state)) {
+            if (Object.hasOwn(urlParams, key)) {
+                if (Object.hasOwn(value, "value")) urlParams[key].value = value;
+            }
+            else {
+                console.log("Unknown search param '" + key + "'");
+            }
+        }
+    }
+    urlParams["page"] = state["page"] || 1;
+    currentPage = urlParams["page"];
 }
 
 // Initialize
@@ -26,6 +29,7 @@ async function init() {
     setupEventListeners();
     processUrl();
     performSearch(false);
+    updatePagination(paginationContainer);
 }
 
 // Load replay data and aliases
@@ -209,7 +213,7 @@ function unloadVideo(videoDiv) {
 }
 
 // render helpers
-function displayReplays(list, page = 1) {
+function displayReplays(list, updateUrl, page = 1) {
     currentSearchResults = list;
     totalPages  = Math.max(1, Math.ceil(list.length / config.pageSize));
     currentPage = Math.min(Math.max(1, page), totalPages);
@@ -231,6 +235,19 @@ function displayReplays(list, page = 1) {
     }
 
     updatePagination(paginationContainer);
+
+    if (updateUrl) {
+        const url = new URL(window.location);
+        url.searchParams.delete("page");
+        if (currentPage != 1) url.searchParams.set("page", currentPage);
+        const state = {
+            page: currentPage,
+        }
+        for (const [key, value] of Object.entries(urlParams)) {
+            if (Object.hasOwn(value, "value")) state[key].value = value;
+        }
+        history.pushState(state, "", url);
+    }
 }
 
 
@@ -247,7 +264,7 @@ function updatePagination(paginationContainer) {
         button.disabled = disabled;
         if (active) button.classList.add('active');
         if (!disabled) {
-            button.addEventListener('click', () => displayReplays(currentSearchResults, page));
+            button.addEventListener('click', () => displayReplays(currentSearchResults, true, page));
         }
         return button;
     };
@@ -384,7 +401,8 @@ function performSearch(updateUrl) {
             return searchMatch && tournamentMatch && player1Match && player2Match;
         });
 
-        displayReplays(filtered);
+        let tempPage = updateUrl ? 1 : currentPage;
+        displayReplays(filtered, false, tempPage);
     }, 200);
 
     if (updateUrl) {
@@ -396,9 +414,12 @@ function performSearch(updateUrl) {
         if (player2TagTerm) url.searchParams.set("p2tag", player2TagTerm);
         if (player1Character) url.searchParams.set("p1char", player1Character);
         if (player2Character) url.searchParams.set("p2char", player2Character);
-        const state = {}
-        for (const [key, value] of Object.entries(searchParams)) {
-            state[key] = value.value
+        if (currentPage != 1) url.searchParams.set("page", currentPage);
+        const state = {
+            page: currentPage,
+        }
+        for (const [key, value] of Object.entries(urlParams)) {
+            if (Object.hasOwn(value, "value")) state[key].value = value;
         }
         history.pushState(state, "", url);
     }
@@ -411,6 +432,7 @@ function performReset() {
     player2TagSelect.value = "";
     player1CharacterSelect.value = "";
     player2CharacterSelect.value = "";
+    currentPage = 1;
     performSearch(true);
 }
 
@@ -490,13 +512,14 @@ const paginationContainer = document.getElementById('pagination');
 const loadingMessage = resultsContainer.querySelector('.loading-message');
 const noResultsMessage = resultsContainer.querySelector('.no-results-message');
 
-const searchParams = {
+const urlParams = {
     search: searchInput,
     tournament: tournamentSelect,
     p1tag: player1TagSelect,
     p2tag: player2TagSelect,
     p1char: player1CharacterSelect,
     p2char: player2CharacterSelect,
+    page: currentPage,
 };
 
 // Start the app
