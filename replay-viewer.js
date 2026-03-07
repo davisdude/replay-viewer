@@ -12,7 +12,7 @@ function processState(state) {
     else {
         for (const [key, value] of Object.entries(state)) {
             if (Object.hasOwn(urlParams, key)) {
-                if (Object.hasOwn(value, "value")) urlParams[key].value = value;
+                if (urlParams[key] instanceof Element) urlParams[key].value = value;
             }
             else {
                 console.log("Unknown search param '" + key + "'");
@@ -377,6 +377,8 @@ function getPlayerMatch(replay, playerTag, character, skip) {
 
 // Search functionality
 function performSearch(updateUrl) {
+    currentPage = updateUrl ? 1 : currentPage;
+
     const searchTerm = searchInput.value.trim();
     const tournamentTerm = tournamentSelect.value;
     const player1TagTerm = player1TagSelect.value;
@@ -401,8 +403,7 @@ function performSearch(updateUrl) {
             return searchMatch && tournamentMatch && player1Match && player2Match;
         });
 
-        let tempPage = updateUrl ? 1 : currentPage;
-        displayReplays(filtered, false, tempPage);
+        displayReplays(filtered, false, currentPage);
     }, 200);
 
     if (updateUrl) {
