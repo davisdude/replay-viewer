@@ -51,7 +51,7 @@ def get_youtube_id_from_url(url: str):
         return None
     return match.group("id")
 
-def get_vod_data(set_obj, tournament_name: str, date: str, video_url: str):
+def get_vod_data(set_obj, tournament_name: str, date: str, video_url: str, tournament_short: str):
     if (len(set_obj["entrant_1_gamer_tags"]) != 1 or len(set_obj["entrant_2_gamer_tags"]) != 1):
         return None
 
@@ -66,6 +66,7 @@ def get_vod_data(set_obj, tournament_name: str, date: str, video_url: str):
         "youtubeId": youtube_id,
         "date": date,
         "tournament": tournament_name,
+        "tournamentShort": tournament_short or tournament_name,
         "player1": set_obj["entrant_1_gamer_tags"][0],
         "player1Characters": entrant_1_characters,
         "player2": set_obj["entrant_2_gamer_tags"][0],
@@ -134,12 +135,12 @@ def get_tournament_sets_name_and_date(slug: str, event_ids: list[int]):
                 })
     return sets, name, date
 
-def get_sets_vod_urls(sets: list, tournament_name: str, tournament_date: str):
+def get_sets_vod_urls(sets: list, tournament_name: str, tournament_date: str, tournament_short: str):
     data = []
     for set_obj in sets:
         video_url = set_obj["vod_url"]
         if video_url is not None:
-            vod_data = get_vod_data(set_obj, tournament_name, tournament_date, video_url)
+            vod_data = get_vod_data(set_obj, tournament_name, tournament_date, video_url, tournament_short)
             if vod_data is not None:
                 data.append(vod_data)
     return data
@@ -171,7 +172,8 @@ def match_videos_to_sets(videos: list[tuple[str, str]],
                          name: str,
                          date: str,
                          suffix: str,
-                         interactive: bool):
+                         interactive: bool,
+                         tournament_short: str):
     data = []
     set_video_urls: list[tuple[any, str]] = []
     unmatched_videos: list[tuple[str, str]] = []
@@ -186,7 +188,7 @@ def match_videos_to_sets(videos: list[tuple[str, str]],
             exact_match_sets, only_tags_match_sets = get_matching_sets(new_title, sets)
             if len(exact_match_sets) == 1:
                 set_video_urls.append((exact_match_sets[0], video_url))
-                vod_data = get_vod_data(exact_match_sets[0], name, date, video_url)
+                vod_data = get_vod_data(exact_match_sets[0], name, date, video_url, tournament_short)
                 if vod_data is not None:
                     data.append(vod_data)
                 sets.remove(exact_match_sets[0])
@@ -196,7 +198,7 @@ def match_videos_to_sets(videos: list[tuple[str, str]],
                 set_matches.append(exact_match_sets)
             elif len(only_tags_match_sets) == 1:
                 set_video_urls.append((only_tags_match_sets[0], video_url))
-                vod_data = get_vod_data(only_tags_match_sets[0], name, date, video_url)
+                vod_data = get_vod_data(only_tags_match_sets[0], name, date, video_url, tournament_short)
                 if vod_data is not None:
                     data.append(vod_data)
                 sets.remove(only_tags_match_sets[0])
@@ -228,7 +230,7 @@ def match_videos_to_sets(videos: list[tuple[str, str]],
                             set_obj = subset_matches[choice_int]
                             video_url = next_video[1]
                             set_video_urls.append((set_obj, video_url))
-                            vod_data = get_vod_data(set_obj, name, date, video_url)
+                            vod_data = get_vod_data(set_obj, name, date, video_url, tournament_short)
                             if vod_data is not None:
                                 data.append(vod_data)
                             sets.remove(set_obj)
@@ -247,10 +249,11 @@ def set_tournament_vod_urls(slug: str,
                             dry_run: bool,
                             event_ids: list[int],
                             suffix: str,
-                            interactive: bool):
+                            interactive: bool,
+                            tournament_short: str):
     print(f"Setting VOD URLs for {slug}")
     sets, name, date = get_tournament_sets_name_and_date(slug, event_ids)
-    set_video_urls, data = match_videos_to_sets(videos, sets, name, date, suffix, interactive)
+    set_video_urls, data = match_videos_to_sets(videos, sets, name, date, suffix, interactive, tournament_short)
 
     requests = []
     for set_obj, video_url in set_video_urls:
@@ -266,15 +269,15 @@ def set_tournament_vod_urls(slug: str,
             requests = requests[500:]
         print(f"{original_requests_len} new VOD URLs set in {slug}")
 
-    existing_data = get_sets_vod_urls(sets, name, date)
+    existing_data = get_sets_vod_urls(sets, name, date, tournament_short)
     print(f"{len(existing_data) + len(data) - original_requests_len} existing VOD URLs found in {slug}")
     data.extend(existing_data)
     return data
 
-def get_tournament_vod_urls(slug: str, event_ids: list[int]):
+def get_tournament_vod_urls(slug: str, event_ids: list[int], tournament_short: str):
     print(f"Getting VOD URLs from {slug}")
     sets, name, date = get_tournament_sets_name_and_date(slug, event_ids)
-    data = get_sets_vod_urls(sets, name, date)
+    data = get_sets_vod_urls(sets, name, date, tournament_short)
     print(f"{len(data)} VOD URLs found in {slug}")
     return data
 
@@ -286,7 +289,8 @@ def process(slug: str,
             dry_run: bool,
             event_ids: list[int],
             suffix: str,
-            interactive: bool):
+            interactive: bool,
+            tournament_short: str):
     videos: list[tuple[str, str]] = []
     for playlist_url in playlist_urls:
         print(f"Processing {playlist_url}")
@@ -309,7 +313,7 @@ def process(slug: str,
 
     data = []
     if len(videos) == 0:
-        data.extend(get_tournament_vod_urls(slug, event_ids))
+        data.extend(get_tournament_vod_urls(slug, event_ids, tournament_short))
     else:
         data.extend(set_tournament_vod_urls(slug,
                                             videos,
@@ -317,7 +321,8 @@ def process(slug: str,
                                             dry_run,
                                             event_ids,
                                             suffix,
-                                            interactive))
+                                            interactive,
+                                            tournament_short))
 
     json.dump(data, out, indent=2)
 
@@ -332,6 +337,7 @@ if __name__ == "__main__":
     parser.add_argument("--event-ids", nargs="*", type=int, default=[])
     parser.add_argument("--suffix", type=str, default="")
     parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--tournament-short", type=str)
     args = parser.parse_args()
 
     process(**vars(args))
