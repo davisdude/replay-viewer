@@ -348,7 +348,7 @@ function getSearchableMatch(replay, searchTerm) {
 
     return searchPieces.every(piece => {
         // Check aliases
-        const aliases = getPlayerAliases(piece);
+        const [_, aliases] = getPlayerAliases(piece);
         if (aliases.length > 0) {
             return aliases.some(alias => {
                 const lowerAlias = alias.toLowerCase();
