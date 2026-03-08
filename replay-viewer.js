@@ -340,7 +340,8 @@ function updatePagination(paginationContainer) {
 function getSearchableMatch(replay, searchTerm) {
     if (!searchTerm) return true;
 
-    const searchPieces = searchTerm.toLowerCase().split(/\s+/);
+    const lowerSearchTerm = searchTerm.toLowerCase()
+    const searchPieces = lowerSearchTerm.split(/\s+/);
 
     if (!replay.player1 || !replay.player2) return false;
 
@@ -348,7 +349,7 @@ function getSearchableMatch(replay, searchTerm) {
 
     return searchPieces.every(piece => {
         // Check aliases
-        const [_, aliases] = getPlayerAliases(piece);
+        const [_, aliases] = getPlayerAliases(piece, false);
         if (aliases.length > 0) {
             return aliases.some(alias => {
                 const lowerAlias = alias.toLowerCase();
@@ -356,6 +357,13 @@ function getSearchableMatch(replay, searchTerm) {
                        replay.player2.toLowerCase() === lowerAlias ||
                        searchableText.includes(lowerAlias);
             });
+        }
+        else {
+            for (const aliases of Object.values(playerAliases)) {
+                for (const alias of aliases) {
+                    if (lowerSearchTerm.includes(alias.toLowerCase())) return true;
+                }
+            }
         }
 
         // Default search
@@ -464,7 +472,7 @@ function performReset() {
 }
 
 // Get player aliases
-function getPlayerAliases(searchTerm) {
+function getPlayerAliases(searchTerm, partialMatch=true) {
     const normalized = searchTerm.toLowerCase().trim();
     for (const [mainPlayer, aliases] of Object.entries(playerAliases)) {
         const normalizedAliases = aliases.map(alias => alias.toLowerCase().trim());
@@ -472,7 +480,8 @@ function getPlayerAliases(searchTerm) {
             return [mainPlayer, aliases];
         }
     }
-    return [searchTerm, [searchTerm]];
+    if (partialMatch) return [searchTerm, [searchTerm]];
+    return [searchTerm, []];
 }
 
 const characterIcons = {
