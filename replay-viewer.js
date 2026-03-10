@@ -337,38 +337,23 @@ function updatePagination(paginationContainer) {
     );
 }
 
+function getReplayPlayerInfoString(replay, player) {
+    const [_, aliases] = getPlayerAliases(replay["player" + player]);
+    const chars = replay["player" + player + "Characters"] || [];
+    return `${aliases.join(" ")} ${chars.join(" ")}`;
+}
+
 function getSearchableMatch(replay, searchTerm) {
     if (!searchTerm) return true;
-
-    const lowerSearchTerm = searchTerm.toLowerCase()
-    const searchPieces = lowerSearchTerm.split(/\s+/);
-
     if (!replay.player1 || !replay.player2) return false;
+    const lowerSearchTerms = searchTerm.toLowerCase().split(/\s+/);
 
-    const searchableText = `${replay.player1} ${replay.player2} ${(replay.player1Characters || []).join(' ')} ${(replay.player2Characters || []).join(' ')} ${replay.tournament}`.toLowerCase();
+    const p1str = getReplayPlayerInfoString(replay, 1);
+    const p2str = getReplayPlayerInfoString(replay, 2);
+    const searchableText = `${p1str} ${p2str} ${replay.tournamentShort} ${replay.tournament}`.toLowerCase();
 
-    return searchPieces.every(piece => {
-        // Check aliases
-        const [_, aliases] = getPlayerAliases(piece, false);
-        if (aliases.length > 0) {
-            return aliases.some(alias => {
-                const lowerAlias = alias.toLowerCase();
-                return replay.player1.toLowerCase() === lowerAlias ||
-                       replay.player2.toLowerCase() === lowerAlias ||
-                       searchableText.includes(lowerAlias);
-            });
-        }
-        else {
-            for (const aliases of Object.values(playerAliases)) {
-                for (const alias of aliases) {
-                    if (lowerSearchTerm.includes(alias.toLowerCase())) return true;
-                }
-            }
-        }
-
-        // Default search
-        return searchableText.includes(piece);
-    });
+    // All search terms matched
+    if (lowerSearchTerms.every((piece) => searchableText.includes(piece))) return true;
 }
 
 function getTournamentMatch(replay, tournament) {
