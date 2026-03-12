@@ -343,17 +343,24 @@ function getReplayPlayerInfoString(replay, player) {
     return `${aliases.join(" ")} ${chars.join(" ")}`;
 }
 
+function normalize(text) {
+    return text.toLowerCase().replace(/[^0-9a-z\s]/gi, '');
+}
+
 function getSearchableMatch(replay, searchTerm) {
     if (!searchTerm) return true;
     if (!replay.player1 || !replay.player2) return false;
-    const lowerSearchTerms = searchTerm.toLowerCase().split(/\s+/);
+    const lowerSearchTerms = normalize(searchTerm).split(/\s+/);
 
     const p1str = getReplayPlayerInfoString(replay, 1);
     const p2str = getReplayPlayerInfoString(replay, 2);
-    const searchableText = `${p1str} ${p2str} ${replay.tournamentShort} ${replay.tournament}`.toLowerCase();
+    const searchableText = normalize(`${p1str} ${p2str} ${replay.tournamentShort} ${replay.tournament}`);
 
     // All search terms matched
-    if (lowerSearchTerms.every((piece) => searchableText.includes(piece))) return true;
+    return lowerSearchTerms.every((piece) => {
+        const regex = new RegExp(`\\b${piece}\\b`);
+        return !!searchableText.match(regex);
+    });
 }
 
 function getTournamentMatch(replay, tournament) {
