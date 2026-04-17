@@ -181,7 +181,7 @@ def match_videos_to_sets(videos: list[tuple[str, str]],
     current_videos = videos
     while len(current_videos) > 0:
         next_videos: list[tuple[str, str]] = []
-        set_matches: list[set_obj] = []
+        set_matches: list[list] = []
         for video in current_videos:
             video_title, video_url = video
             new_title = video_title.replace(suffix, "", 1)
