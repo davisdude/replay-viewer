@@ -87,6 +87,25 @@ def normalize(string: str):
     # sanitize for filename legality
     sanitized = sanitize("".join(normalized_non_combining_chars))
 
+    # unreplace (all) confusables (ever) used by slp2mp4
+    unreplace_dict = {
+        "–": "-",
+        "—": "-",
+        "⟮": "(",
+        "⟯": ")",
+        "＿": "_",
+        "＜": "<",
+        "＞": ">",
+        "․": ".",
+        "．": ".",
+        "⧸": "/",
+        "：": ":",
+        "＇": "'",
+        "＂": '"',
+    }
+    for old, new in unreplace_dict.items():
+        sanitized = sanitized.replace(old, new)
+
     # replace chars that YT replaces with space
     yt_space_replaced = re.sub(r'[.\-_]', ' ', sanitized)
 
