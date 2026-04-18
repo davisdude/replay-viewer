@@ -491,7 +491,7 @@ const characterIcons = {
     "Luigi": "🎰",
     "Mario": "🇮🇹",
     "Marth": "🤺",
-    "Mewtwo": "🧠",
+    "Mewtwo": "👽",
     "Mr. Game & Watch": "🫥",
     "Ness": "🧢",
     "Peach": "👑",
