@@ -1,5 +1,5 @@
 google-api-python-client==2.170.0
 gql[all]==4.0.0
-pytubefix==10.3.8
+pytubefix==10.7.2
 tzdata==2025.2
 sanitize-filename==1.2.0
